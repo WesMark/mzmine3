@@ -18,11 +18,12 @@
 package io.github.mzmine.modules.dataprocessing.filter_typeiicorrection;
 
 import com.google.common.collect.Range;
-import com.mysql.jdbc.RowData;
+import io.github.mzmine.datamodel.FeatureStatus;
 import io.github.mzmine.datamodel.IsotopePattern;
 import io.github.mzmine.datamodel.MZmineProject;
 import io.github.mzmine.datamodel.RawDataFile;
 import io.github.mzmine.datamodel.Scan;
+import io.github.mzmine.datamodel.featuredata.FeatureDataUtils;
 import io.github.mzmine.datamodel.featuredata.IonTimeSeries;
 import io.github.mzmine.datamodel.features.Feature;
 import io.github.mzmine.datamodel.features.FeatureList;
@@ -31,6 +32,7 @@ import io.github.mzmine.datamodel.features.ModularFeature;
 import io.github.mzmine.datamodel.features.ModularFeatureList;
 import io.github.mzmine.datamodel.features.SimpleFeatureListAppliedMethod;
 import io.github.mzmine.datamodel.features.compoundannotations.FeatureAnnotation;
+import io.github.mzmine.datamodel.features.types.DetectionType;
 import io.github.mzmine.datamodel.features.types.FeatureDataType;
 import io.github.mzmine.modules.tools.isotopeprediction.IsotopePatternCalculator;
 import io.github.mzmine.parameters.ParameterSet;
@@ -59,16 +61,16 @@ public class TypeIICorrectionTask extends AbstractTask {
   private final MZmineProject project;
   private final ModularFeatureList originalFeatureList;
   private ModularFeatureList processedFeatureList;
-
   private final MZTolerance featureToPatternMzTol = new MZTolerance(0.005, 5);
-
-
   // features counter
+  private final double mergeWidth = 0.005;
   private int finished;
   private int totalRows;
-  private final double mergeWidth = 0.005;
+
+  //Counter for logging.
   private int rtMismatch = 0;
-  private int missingFormula = 0;
+  private int changedFeatures = 0;
+  private int removedFeatures = 0;
 
   /**
    * Constructor used to extract all parameters
@@ -141,23 +143,24 @@ public class TypeIICorrectionTask extends AbstractTask {
         FeatureAnnotation annotation = FeatureUtils.getBestFeatureAnnotation(row);
         if (annotation == null || annotation.getFormula() == null
             || annotation.getAdductType() == null) {
-
-          missingFormula++;
           continue;
         }
 
-        //Converting the molecular formula string to an IMolecularFormula object.
+        //Converting the molecular formula string for the neutral molecule to an IMolecularFormula object.
         IMolecularFormula molecularFormula = MolecularFormulaManipulator.getMolecularFormula(
             annotation.getFormula(), SilentChemObjectBuilder.getInstance());
+
+        //Adding the adduct to the molecular formula.
+        IMolecularFormula chargedFormula;
         try {
-          annotation.getAdductType().addToFormula(molecularFormula);
+          chargedFormula = annotation.getAdductType().addToFormula(molecularFormula);
         } catch (CloneNotSupportedException e) {
           throw new RuntimeException(e);
         }
 
-        //Calculating the predicted isotope pattern from the features formula.
+        //Calculating the predicted isotope pattern from the features charged molecular formula.
         final IsotopePattern isotopePattern = IsotopePatternCalculator.calculateIsotopePattern(
-            molecularFormula, 0.01, mergeWidth, Math.abs(annotation.getAdductType().getCharge()),
+            chargedFormula, 0.01, mergeWidth, Math.abs(annotation.getAdductType().getCharge()),
             monoisotopicFeature.getRepresentativeScan().getPolarity(), false);
 
         //Calculating the isotope patterns mz range considering the mz tolerance.
@@ -176,6 +179,7 @@ public class TypeIICorrectionTask extends AbstractTask {
           }
 
           //Breaking the loop if the following feature is outside the isotope pattern mz range.
+          //Continuing with the next monoisotopic feature.
           if (!totalIsotopePatternMzRange.contains(overlapFeature.getMZ())) {
             break;
           }
@@ -213,29 +217,19 @@ public class TypeIICorrectionTask extends AbstractTask {
           int overlapFeatureUpperIndex = getIndexForRt(overlapEic, upperRtOverlap);
 
           //Checking weather there are jumps in the retention times between the two features.
-          if (!checkIfRtsMatch(monoisotopicEic, monoisotopicFeatureLowerIndex,
+          //Continuing with the next overlap feature if there are.
+          if (!rtsMatching(monoisotopicEic, monoisotopicFeatureLowerIndex,
               monoisotopicFeatureUpperIndex, overlapEic, overlapFeatureLowerIndex)) {
 
+            //Increasing the counter for logging the number of times the rts didn't match.
             rtMismatch++;
             continue;
           }
-
-          /**
-           //The indices of both features aligned by retention time.
-           int[][] alignedIndices = getAlignedIndices(monoisotopicEic, monoisotopicFeatureLowerIndex,
-           monoisotopicFeatureUpperIndex, overlapEic, overlapFeatureLowerIndex,
-           overlapFeatureUpperIndex);
-           */
 
           //Calculating the relative intensity of the monoisotopic features isotope.
           IsotopePattern relativeIsotopePattern = isotopePattern.getRelativeIntensityCopy();
           final double relativeIsotopeIntensity = relativeIsotopePattern.getIntensityValue(
               isotopePatternIndex);
-
-          /**
-           double[] correctedIntensities = subtractIsootpeIntensity(monoisotopicEic, overlapEic,
-           alignedIndices, relativeIsotopeIntensity);
-           */
 
           double[] correctedIntensities = subtractIsotopeIntensities(monoisotopicEic,
               monoisotopicFeatureLowerIndex, overlapEic, overlapFeatureLowerIndex,
@@ -245,13 +239,49 @@ public class TypeIICorrectionTask extends AbstractTask {
           double[] overlapFeatureMzs = overlapEic.getMzValues(
               new double[overlapEic.getNumberOfValues()]);
 
+          //Area of the overlap feature before correction for logging purposes.
+          double overlapFeatureArea = overlapFeature.getArea();
+
           //Writing the new intensities to the feature.
           IonTimeSeries<? extends Scan> correctedOverlapEic = (IonTimeSeries<? extends Scan>) overlapEic.copyAndReplace(
               getMemoryMapStorage(), overlapFeatureMzs, correctedIntensities);
           overlapFeature.set(FeatureDataType.class, correctedOverlapEic);
 
-          logger.info("Changed feature of m/z: " + overlapFeature.getMZ());
+          //Changing the detection type to manual so that changed features can be identified in the feature list.
+          overlapFeature.set(DetectionType.class, FeatureStatus.MANUAL);
 
+          //Recalculating the overlap features data which depends on the changed intensity data.
+          FeatureDataUtils.recalculateIonSeriesDependingTypes(overlapFeature);
+
+          //Area of the overlap feature after correction for logging purposes.
+          double correctedOverlapFeatureArea = overlapFeature.getArea();
+
+          //Boolean variable for logging weather a feature was removed.
+          boolean featureRemoved = false;
+
+          //Removing a feature if its corrected area is below 100.
+          if (overlapFeature.getArea() < 100) {
+
+            followingRow.removeFeature(overlapFeature.getRawDataFile());
+            removedFeatures++;
+
+            featureRemoved = true;
+          }
+
+          //Removing a row if it doesn't contain any features anymore.
+          if (followingRow.getNumberOfFeatures() == 0) {
+
+            processedFeatureList.removeRow(followingRow);
+          }
+
+          //Increasing the counter for logging the total number of changed features.
+          changedFeatures++;
+
+          //Logging information of the changed features.
+          logger.info("Overlap feature ID: " + overlapFeature.getRow().getID()
+              + "\n Monoisotopic Feature ID: " + monoisotopicFeature.getRow().getID()
+              + "\n Area changed from " + overlapFeatureArea + " to " + correctedOverlapFeatureArea
+              + "\n Feature was removed: " + featureRemoved);
         }
 
         // Update progress
@@ -259,12 +289,14 @@ public class TypeIICorrectionTask extends AbstractTask {
       }
     }
 
+    //Keeping the original feature list and showing the processed one in the project.
     OriginalFeatureListOption.KEEP.reflectNewFeatureListToProject("typeII", project,
         processedFeatureList, originalFeatureList);
 
-    logger.info("Total fetaures: " + totalRows);
-    logger.info("Times retention times mismatched: " + rtMismatch);
-    logger.info("Missing Formulas: " + missingFormula);
+    //Logging statistics.
+    logger.info(
+        "Times retention times mismatched: " + rtMismatch + "\n Number of changed features: "
+            + changedFeatures + "\n Number of removed features: " + removedFeatures);
 
     // add to project
     addAppliedMethodsAndResultToProject();
@@ -276,34 +308,42 @@ public class TypeIICorrectionTask extends AbstractTask {
 
   public static int getMatchingIndexInIsotopePattern(IsotopePattern isotopePattern, double mz,
       MZTolerance featureToPatternMzTol) {
+
+    //Going over all mzs in the isotope pattern until an isotope mz matches the wanted mz.
     for (int i = 0; i < isotopePattern.getNumberOfDataPoints(); i++) {
       if (featureToPatternMzTol.checkWithinTolerance(mz, isotopePattern.getMzValue(i))) {
         return i;
       }
     }
+
+    //Returning -1 if no matching mz is found.
     return -1;
   }
 
 
   public static int getIndexForRt(IonTimeSeries<? extends Scan> eic, float rt) {
 
+    //Going over all scans in the eic until the scans rt matches the wanted rt.
     for (int i = 0; i < eic.getNumberOfValues(); i++) {
 
       if (Math.abs(eic.getRetentionTime(i) - rt) < 0.000001) {
         return i;
       }
     }
+
+    //Returning -1 if no matching rt is found.
     return -1;
   }
 
 
-  public static boolean checkIfRtsMatch(IonTimeSeries<? extends Scan> monoisotopicEic,
+  public static boolean rtsMatching(IonTimeSeries<? extends Scan> monoisotopicEic,
       int monoisotopicFeatureLowerIndex, int monoisotopicFeatureUpperIndex,
       IonTimeSeries<? extends Scan> overlapEic, int overlapFeatureLowerIndex) {
 
     int monoisotopicIndex = monoisotopicFeatureLowerIndex;
     int overlapIndex = overlapFeatureLowerIndex;
 
+    //Going over every index pair of both features and checking weather the rts are the same.
     for (int i = 0; monoisotopicIndex <= monoisotopicFeatureUpperIndex; i++) {
 
       float monoisotopicRt = monoisotopicEic.getRetentionTime(monoisotopicIndex);
@@ -335,53 +375,35 @@ public class TypeIICorrectionTask extends AbstractTask {
     int monoisotopicIndex = monoisotopicFeatureLowerIndex;
     int overlapIndex = overlapFeatueLowerIndex;
 
-    if (overlapEic.getIntensity(overlapFeatueLowerIndex) == 0) {
-
-      correctedIntensities.add(0d);
-      monoisotopicIndex++;
-      overlapIndex++;
-    }
-
     //Correcting and adding the values during the overlap.
-    for (int i = 0; overlapIndex < overlapFeatureUpperIndex; i++) {
+    for (int i = 0; overlapIndex <= overlapFeatureUpperIndex; i++) {
 
       double monoisotopicIntensity = monoisotopicEic.getIntensity(monoisotopicIndex);
       double overlapIntensity = overlapEic.getIntensity(overlapIndex);
 
       double correctedIntensity =
           overlapIntensity - monoisotopicIntensity * relativeIsotopeIntensity;
+
+      //Setting the intensity value to 0 if the calculated intensity is negative
+      if (correctedIntensity < 0) {
+        correctedIntensity = 0d;
+      }
 
       correctedIntensities.add(correctedIntensity);
 
       monoisotopicIndex++;
-      overlapIndex++;
-    }
-
-    if (overlapEic.getIntensity(overlapFeatureUpperIndex) == 0) {
-
-      correctedIntensities.add(0d);
-      overlapIndex++;
-    } else {
-
-      double monoisotopicIntensity = monoisotopicEic.getIntensity(monoisotopicIndex);
-      double overlapIntensity = overlapEic.getIntensity(overlapIndex);
-
-      double correctedIntensity =
-          overlapIntensity - monoisotopicIntensity * relativeIsotopeIntensity;
-
-      correctedIntensities.add(correctedIntensity);
-
       overlapIndex++;
     }
 
     //Adding the values after the overlap.
-    for (int i = overlapIndex; i < overlapEic.getNumberOfValues(); i++) {
+    for (int i = 0; overlapIndex < overlapEic.getNumberOfValues(); i++) {
 
-      correctedIntensities.add(overlapEic.getIntensity(i));
+      correctedIntensities.add(overlapEic.getIntensity(overlapIndex));
+      overlapIndex++;
     }
 
+    //Writing the corrected intensities to an array.
     double[] outputArray = new double[correctedIntensities.size()];
-
     for (int i = 0; i < correctedIntensities.size(); i++) {
 
       outputArray[i] = correctedIntensities.get(i);
@@ -403,232 +425,4 @@ public class TypeIICorrectionTask extends AbstractTask {
   }
 }
 
-/**
- * public static int[][] getAlignedIndices(IonTimeSeries<? extends Scan> monoisotopicEic, int
- * monoisotopicFeatureLowerIndex, int monoisotopicFeatureUpperIndex, IonTimeSeries<? extends Scan>
- * overlapEic, int overlapFeatureLowerIndex, int overlapFeatureUpperIndex) {
- * <p>
- * //Initializing Lists to add the aligned indices to. List<Integer> monoisotopicIndices = new
- * ArrayList<>(); List<Integer> overlapIndices = new ArrayList<>();
- * <p>
- * //Setting the beginning indices for the monoisotopic and the overlapping feature. int
- * monoisotopicIndex = monoisotopicFeatureLowerIndex; int overlapIndex = overlapFeatureLowerIndex;
- * <p>
- * //Adding the beginning indices to the lists. monoisotopicIndices.add(monoisotopicIndex);
- * overlapIndices.add(overlapIndex);
- * <p>
- * //Loop over all the scans within the overlapping region. for (int i = 0; monoisotopicIndex <
- * monoisotopicFeatureUpperIndex && overlapIndex < overlapFeatureUpperIndex; i++) {
- * <p>
- * //Increasing the indices to check the next scans retention times. monoisotopicIndex++;
- * overlapIndex++;
- * <p>
- * //Getting the retention times for the current indices to compare them. float monoisotopicRt =
- * monoisotopicEic.getRetentionTime(monoisotopicIndex); float overlapRt =
- * overlapEic.getRetentionTime(overlapIndex);
- * <p>
- * //Adding both indices to the lists if the retention times are equal. if (Math.abs(monoisotopicRt
- * - overlapRt) < 0.000001) {
- * <p>
- * monoisotopicIndices.add(monoisotopicIndex); overlapIndices.add(overlapIndex); }
- * <p>
- * //Aligning and adding both indices to the lists if there is a jump in the  monoisotopic feature.
- * else if (monoisotopicRt > overlapRt) {
- * <p>
- * int alignedIndex = getIndexForRt(overlapEic, monoisotopicRt);
- * <p>
- * //Adding the aligned indices if they're within the overlap range. if (alignedIndex <=
- * overlapFeatureUpperIndex) {
- * <p>
- * overlapIndex = alignedIndex; monoisotopicIndices.add(monoisotopicIndex);
- * overlapIndices.add(overlapIndex);
- * <p>
- * } else { //Breaking the loop if the index exceeds the overlap range. break; }
- * <p>
- * }
- * <p>
- * //Aligning and adding both indices to the lists if there is a jump in the overlap feature. else
- * {
- * <p>
- * int alignedIndex = getIndexForRt(monoisotopicEic, overlapRt);
- * <p>
- * //Adding the aligned indices if they're within the overlap range. if (alignedIndex <=
- * monoisotopicFeatureUpperIndex) {
- * <p>
- * monoisotopicIndex = alignedIndex; monoisotopicIndices.add(monoisotopicIndex);
- * overlapIndices.add(overlapIndex);
- * <p>
- * } else { //Breaking the loop if the index exceeds the overlap area. break; } } }
- * <p>
- * int[][] alignedIndices = removeDatatpointsWithoutIntensity(monoisotopicEic, overlapEic,
- * monoisotopicIndices, overlapIndices);
- * <p>
- * return alignedIndices; }
- * <p>
- * <p>
- * public static int[][] removeDatatpointsWithoutIntensity( IonTimeSeries<? extends Scan>
- * monoisotopicEic, IonTimeSeries<? extends Scan> overlapEic, List<Integer> monoisotopicIndices,
- * List<Integer> overlapIndices) {
- * <p>
- * List<Integer> filteredMonoisotopicIndices = new ArrayList<>(); List<Integer>
- * filteredOverlapIndices = new ArrayList<>();
- * <p>
- * int startMapIndex = 0; int maxMapIndex = monoisotopicIndices.size() - 1;
- * <p>
- * if (monoisotopicIndices.get(0) == 0 || overlapIndices.get(0) == 0) {
- * <p>
- * filteredMonoisotopicIndices.add(monoisotopicIndices.get(0));
- * filteredOverlapIndices.add(overlapIndices.get(0));
- * <p>
- * startMapIndex = 1; }
- * <p>
- * for (int i = startMapIndex; i < maxMapIndex; i++) {
- * <p>
- * int monoisotopicIndex = monoisotopicIndices.get(i); int overlapIndex = overlapIndices.get(i);
- * <p>
- * if (monoisotopicEic.getIntensity(monoisotopicIndex) != 0 && overlapEic.getIntensity(overlapIndex)
- * != 0) {
- * <p>
- * filteredMonoisotopicIndices.add(monoisotopicIndex); filteredOverlapIndices.add(overlapIndex);
- * <p>
- * } }
- * <p>
- * int monoisotopicIndicesLastIndex = monoisotopicIndices.get(monoisotopicIndices.size() - 1); int
- * monoisotopicFeatureLastIndex = monoisotopicEic.getNumberOfValues() - 1;
- * <p>
- * int overlapIndicesLastIndex = overlapIndices.get(overlapIndices.size() - 1); int
- * overlapFeatureLastIndex = overlapEic.getNumberOfValues() - 1;
- * <p>
- * if (monoisotopicIndicesLastIndex == monoisotopicFeatureLastIndex || overlapIndicesLastIndex ==
- * overlapFeatureLastIndex) {
- * <p>
- * filteredMonoisotopicIndices.add(monoisotopicIndicesLastIndex);
- * filteredOverlapIndices.add(overlapIndicesLastIndex);
- * <p>
- * } else if (monoisotopicEic.getIntensity(monoisotopicIndicesLastIndex) != 0 &&
- * overlapEic.getIntensity(overlapIndicesLastIndex) != 0) {
- * <p>
- * filteredMonoisotopicIndices.add(monoisotopicIndicesLastIndex);
- * filteredOverlapIndices.add(overlapIndicesLastIndex);
- * <p>
- * }
- * <p>
- * int[][] filteredIndices = new int[2][filteredMonoisotopicIndices.size()];
- * <p>
- * for (int i = 0; i < filteredMonoisotopicIndices.size(); i++) {
- * <p>
- * filteredIndices[0][i] = filteredMonoisotopicIndices.get(i); filteredIndices[1][i] =
- * filteredOverlapIndices.get(i);
- * <p>
- * }
- * <p>
- * return filteredIndices; }
- * <p>
- * public static double[] subtractIsotopeIntensities(IonTimeSeries<? extends Scan> monoisotopicEic,
- * IonTimeSeries<? extends Scan> overlapEic, int[][] alignedIndices, double
- * relativeIsotopeIntensity) {
- * <p>
- * List<Double> correctedIntensities = new ArrayList<>();
- * <p>
- * int overlapFeatureLowerIndex = alignedIndices[1][0]; int overlapFeatureUpperIndex =
- * alignedIndices[1][alignedIndices[1].length - 1];
- * <p>
- * //Writing the overlap features intensities before the overlap. for (int i = 0; i <
- * overlapFeatureLowerIndex; i++) { correctedIntensities.add(overlapEic.getIntensity(i)); }
- * <p>
- * //Subtracting the isotope intensities during the overlap. for (int i = 0; i <=
- * alignedIndices[0].length; i++) {
- * <p>
- * int monoisotopicIndex = alignedIndices[0][i]; int overlapIndex = alignedIndices[1][i];
- * <p>
- * double correctedIntensity = overlapEic.getIntensity(overlapIndex) -
- * monoisotopicEic.getIntensity(monoisotopicIndex) * relativeIsotopeIntensity;
- * <p>
- * correctedIntensities.add(correctedIntensity); }
- * <p>
- * //Writing the overlap features intensities after the overlap. for (int i =
- * overlapFeatureUpperIndex + 1; i < overlapEic.getNumberOfValues(); i++) {
- * correctedIntensities.add(overlapEic.getIntensity(i)); }
- * <p>
- * double[] output = new double[correctedIntensities.size()];
- * <p>
- * for (int i = 0; i < correctedIntensities.size(); i++) { output[i] = correctedIntensities.get(i);
- * }
- * <p>
- * return output; }
- * <p>
- * public static double[] subtractIsotopeIntensities(IonTimeSeries<? extends Scan> monoisotopicEic,
- * IonTimeSeries<? extends Scan> overlapEic, int[][] alignedIndices, double
- * relativeIsotopeIntensity) {
- * <p>
- * List<Double> correctedIntensities = new ArrayList<>();
- * <p>
- * int overlapFeatureLowerIndex = alignedIndices[1][0]; int overlapFeatureUpperIndex =
- * alignedIndices[1][alignedIndices[1].length - 1];
- * <p>
- * //Writing the overlap features intensities before the overlap. for (int i = 0; i <
- * overlapFeatureLowerIndex; i++) { correctedIntensities.add(overlapEic.getIntensity(i)); }
- * <p>
- * //Subtracting the isotope intensities during the overlap. for (int i = 0; i <=
- * alignedIndices[0].length; i++) {
- * <p>
- * int monoisotopicIndex = alignedIndices[0][i]; int overlapIndex = alignedIndices[1][i];
- * <p>
- * double correctedIntensity = overlapEic.getIntensity(overlapIndex) -
- * monoisotopicEic.getIntensity(monoisotopicIndex) * relativeIsotopeIntensity;
- * <p>
- * correctedIntensities.add(correctedIntensity); }
- * <p>
- * //Writing the overlap features intensities after the overlap. for (int i =
- * overlapFeatureUpperIndex + 1; i < overlapEic.getNumberOfValues(); i++) {
- * correctedIntensities.add(overlapEic.getIntensity(i)); }
- * <p>
- * double[] output = new double[correctedIntensities.size()];
- * <p>
- * for (int i = 0; i < correctedIntensities.size(); i++) { output[i] = correctedIntensities.get(i);
- * }
- * <p>
- * return output; }
- */
 
-/**
- public static double[] subtractIsotopeIntensities(IonTimeSeries<? extends Scan> monoisotopicEic,
- IonTimeSeries<? extends Scan> overlapEic, int[][] alignedIndices,
- double relativeIsotopeIntensity) {
-
- List<Double> correctedIntensities = new ArrayList<>();
-
- int overlapFeatureLowerIndex = alignedIndices[1][0];
- int overlapFeatureUpperIndex = alignedIndices[1][alignedIndices[1].length - 1];
-
- //Writing the overlap features intensities before the overlap.
- for (int i = 0; i < overlapFeatureLowerIndex; i++) {
- correctedIntensities.add(overlapEic.getIntensity(i));
- }
-
- //Subtracting the isotope intensities during the overlap.
- for (int i = 0; i <= alignedIndices[0].length; i++) {
-
- int monoisotopicIndex = alignedIndices[0][i];
- int overlapIndex = alignedIndices[1][i];
-
- double correctedIntensity = overlapEic.getIntensity(overlapIndex)
- - monoisotopicEic.getIntensity(monoisotopicIndex) * relativeIsotopeIntensity;
-
- correctedIntensities.add(correctedIntensity);
- }
-
- //Writing the overlap features intensities after the overlap.
- for (int i = overlapFeatureUpperIndex + 1; i < overlapEic.getNumberOfValues(); i++) {
- correctedIntensities.add(overlapEic.getIntensity(i));
- }
-
- double[] output = new double[correctedIntensities.size()];
-
- for (int i = 0; i < correctedIntensities.size(); i++) {
- output[i] = correctedIntensities.get(i);
- }
-
- return output;
- }
- */

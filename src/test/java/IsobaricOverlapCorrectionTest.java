@@ -40,10 +40,10 @@ public class IsobaricOverlapCorrectionTest {
 
     List<Scan> scans = new ArrayList<>();
 
+    //Creating scans with just the rts added to them.
     for (int i = 0; i < numScans; i++) {
-      SimpleScan scan = new SimpleScan(file, i, 1, i * rtFactor + rtShift, null,
-          new double[]{0d, 1}, new double[]{15d, 1E5}, MassSpectrumType.CENTROIDED,
-          PolarityType.POSITIVE, "test", Range.closed(0d, 1d));
+      SimpleScan scan = new SimpleScan(file, i, 1, i * rtFactor + rtShift, null, null, null, null,
+          null, "test", null);
 
       scans.add(scan);
     }
@@ -52,6 +52,7 @@ public class IsobaricOverlapCorrectionTest {
 
   public double[] createFilledArray(int arrayLength) {
 
+    //Filling an array of the length arrayLength with the value 1.
     double[] outputArray = new double[arrayLength];
     for (int i = 0; i < arrayLength; i++) {
       outputArray[i] = 1d;
@@ -62,23 +63,29 @@ public class IsobaricOverlapCorrectionTest {
   public IonTimeSeries<Scan> createEic(int numScans, float rtSteps, float rtStart, double[] mzs,
       double[] intensities) {
 
+    //Creating arrays for the mz and intensity values.
     double[] mzData;
     double[] intensityData;
 
+    //Filling the mz array with values of 1 if no mz values are passed.
     if (mzs == null) {
       mzData = createFilledArray(numScans);
     } else {
       mzData = mzs;
     }
 
+    //Filling the intensity array with values of 1 if no intensity values are passed.
     if (intensities == null) {
       intensityData = createFilledArray(numScans);
     } else {
       intensityData = intensities;
     }
 
+    //Creating scans for the given rt spacing.
     RawDataFile file = new RawDataFileImpl("file", null, null);
     List<Scan> scans = makeSomeScans(file, numScans, rtSteps, rtStart);
+
+    //Creating the eic from the scans, mz and intenity values.
     IonTimeSeries<Scan> eic = new SimpleIonTimeSeries(null, mzData, intensityData, scans);
 
     return eic;
@@ -90,7 +97,7 @@ public class IsobaricOverlapCorrectionTest {
 
     //Creating an isotope pattern.
     IsotopePattern pattern = new SimpleIsotopePattern(new double[]{1d, 2d, 3d},
-        new double[]{1, 1, 1}, 1, IsotopePatternStatus.DETECTED, "");
+        new double[]{1, 1, 1}, 1, IsotopePatternStatus.DETECTED, "test");
 
     //Testing a value the pattern contains.
     Assertions.assertEquals(1,
@@ -113,11 +120,7 @@ public class IsobaricOverlapCorrectionTest {
   void testGetIndexForRt() {
 
     //Creating an eic.
-    RawDataFile file = new RawDataFileImpl("file", null, null);
-    final int numScans = 30;
-    List<Scan> scans = makeSomeScans(file, numScans, 0.1f, 0f);
-    IonTimeSeries<Scan> eic = new SimpleIonTimeSeries(null, createFilledArray(numScans),
-        createFilledArray(numScans), scans);
+    IonTimeSeries<Scan> eic = createEic(30, 0.1f, 0f, null, null);
 
     //Testing the expected value.
     Assertions.assertEquals(1, TypeIICorrectionTask.getIndexForRt(eic, 0.1f));
@@ -138,15 +141,17 @@ public class IsobaricOverlapCorrectionTest {
     //Creating an eic for the overlap feature.
     IonTimeSeries<Scan> overlapEic = createEic(31, 0.1f, 1.5f, null, null);
 
-    Assertions.assertTrue(
-        TypeIICorrectionTask.checkIfRtsMatch(monoisotopicEic, 15, 30, overlapEic, 0));
+    Assertions.assertTrue(TypeIICorrectionTask.rtsMatching(monoisotopicEic, 15, 30, overlapEic, 0));
 
     Assertions.assertFalse(
-        TypeIICorrectionTask.checkIfRtsMatch(monoisotopicEic, 15, 30, overlapEic, 1));
+        TypeIICorrectionTask.rtsMatching(monoisotopicEic, 15, 30, overlapEic, 1));
   }
 
   @Test
   void testSubtractIsotopeIntensity() {
+
+    //The relative intensity of the isotope.
+    double relIsotopeIntensity = 0.5d;
 
     //Creating an eic for the monoisotopic feature.
     double[] monoisotopicIntensities = new double[]{0, 50, 100, 500, 1_000, 3_000, 7_000, 10_000,
@@ -154,94 +159,35 @@ public class IsobaricOverlapCorrectionTest {
     IonTimeSeries<Scan> monoisotopicEic = createEic(16, 0.1f, 0.3f, null, monoisotopicIntensities);
 
     //Creating three different overlap features.
-    double[] overlapIntensities1 = new double[]{0, 500, 1_000, 700, 100, 0};
+    double[] overlapIntensities1 = new double[]{0, 1_000, 5_000, 10_000, 4_000, 500};
     IonTimeSeries<Scan> overlapEic1 = createEic(6, 0.1f, 0f, null, overlapIntensities1);
 
-    double[] overlapIntensities2 = new double[]{0, 3000, 70_000, 100_000, 50_000, 0};
+    double[] overlapIntensities2 = new double[]{100, 1_000, 3_000, 5_000, 2_000, 1_000};
     IonTimeSeries<Scan> overlapEic2 = createEic(6, 0.1f, 0.7f, null, overlapIntensities2);
 
-    double[] overlapIntensities3 = new double[]{0, 7_000, 10_000, 5_000, 1_000, 0};
+    double[] overlapIntensities3 = new double[]{0, 500, 700, 1_500, 600, 300};
     IonTimeSeries<Scan> overlapEic3 = createEic(6, 0.1f, 1.5f, null, overlapIntensities3);
 
     //Creating the expected arrays.
-    double[] correctedIntensities1 = new double[]{0, 500, 1_000, 700, 75, 0};
-    double[] correctedIntensities2 = new double[]{0, 1_500, 66_500, 95_000, 46_250, 0};
-    double[] correctedIntensities3 = new double[]{0, 6_750, 9_995, 5_000, 1_000, 0};
+    double[] correctedIntensities1 = new double[]{0, 1_000, 5_000, 10_000, 3_975, 450};
+    double[] correctedIntensities2 = new double[]{0, 0, 0, 0, 0, 0};
+    double[] correctedIntensities3 = new double[]{0, 250, 695, 1_500, 600, 300};
 
+    //Testing a feature that overlaps at the beginning of the monoisotopic feature.
     Assertions.assertArrayEquals(correctedIntensities1,
         TypeIICorrectionTask.subtractIsotopeIntensities(monoisotopicEic, 0, overlapEic1, 3, 5,
-            0.5));
+            relIsotopeIntensity));
 
+    //Testing a feature that completely overlaps with the monoisotopic feature.
     Assertions.assertArrayEquals(correctedIntensities2,
         TypeIICorrectionTask.subtractIsotopeIntensities(monoisotopicEic, 4, overlapEic2, 0, 5,
-            0.5));
+            relIsotopeIntensity));
 
+    //Testing a feature that overlaps at the end of the monoisotopic feature.
     Assertions.assertArrayEquals(correctedIntensities3,
         TypeIICorrectionTask.subtractIsotopeIntensities(monoisotopicEic, 12, overlapEic3, 0, 3,
-            0.5));
+            relIsotopeIntensity));
   }
 
-  /**
-   @Test void testGetAlignedIndices() {
-
-   //Creating an eic for the monoisotopic feature.
-   RawDataFile monoisotopicFile = new RawDataFileImpl("file", null, null);
-   List<Scan> monoisotopicScans = makeSomeScans(monoisotopicFile, 21, 0.1f, 0f);
-   IonTimeSeries<Scan> monoisotopicEic = new SimpleIonTimeSeries(null,
-   makeFilledArray(21), makeFilledArray(21),  monoisotopicScans);
-
-   //Checking the method for an eic that contains one jump in retention time in the overlap feature.
-   RawDataFile oneJumpFile = new RawDataFileImpl("file", null, null);
-   List<Scan> oneJumpScans = makeSomeScans(oneJumpFile, 3, 0.1f, 0.5f);
-   oneJumpScans.addAll(makeSomeScans(oneJumpFile, 8, 0.1f, 1.3f));
-   IonTimeSeries<Scan> oneJumpEic = new SimpleIonTimeSeries(null, makeFilledArray(11),
-   new double[]{1, 1, 0, 0, 1, 1, 1, 1, 1, 1, 1}, oneJumpScans);
-
-   int[][] expectedDataOneStop = new int[][]{{5, 6, 14, 15, 16, 17, 18, 19, 20},
-   {0, 1, 4, 5, 6, 7, 8, 9, 10}};
-
-   Assertions.assertArrayEquals(expectedDataOneStop,
-   TypeIICorrectionTask.getAlignedIndices(monoisotopicEic, 5, 20,
-   oneJumpEic, 0, 10));
-
-
-   //Checking the method for an eic that contains one jump in retention time in the monoisotopic feature.
-   int[][] expectedDataOneStopInverted = new int[][]{{0, 1, 4, 5, 6, 7, 8, 9, 10}, {5, 6, 14, 15, 16, 17, 18, 19, 20}};
-
-   Assertions.assertArrayEquals(expectedDataOneStopInverted, TypeIICorrectionTask.getAlignedIndices(oneJumpEic,
-   0, 10, monoisotopicEic, 5, 20));
-
-
-
-   //Checking the method for an eic that contains two jumps in retention time in the overlap feature.
-   RawDataFile twoStopsFile = new RawDataFileImpl("file", null, null);
-   List<Scan> twoStopsScans = makeSomeScans(twoStopsFile, 3, 0.1f, 0.2f);
-   twoStopsScans.addAll(makeSomeScans(twoStopsFile, 4, 0.1f, 0.9f));
-   twoStopsScans.addAll(makeSomeScans(twoStopsFile, 4, 0.1f, 1.7f));
-   IonTimeSeries<Scan> twoStopEic = new SimpleIonTimeSeries(null, makeFilledArray(11),
-   new double[]{0, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0}, twoStopsScans);
-
-   int[][] expectedDataTwoStops = new int[][]{{2, 3, 10, 11, 18, 19, 20},
-   {0, 1, 4, 5, 8, 9, 10}};
-
-   Assertions.assertArrayEquals(expectedDataTwoStops,
-   TypeIICorrectionTask.getAlignedIndices(monoisotopicEic, 2, 20,
-   twoStopEic, 0, 10));
-
-
-   //Checking the method for an eic that contains one jump in retention time in the overlap feature at the end of the overlapping range.
-   RawDataFile stopAtEndFile = new RawDataFileImpl("file", null, null);
-   List<Scan> stopAtEndScans = makeSomeScans(stopAtEndFile, 4, 0.1f, 1.4f);
-   stopAtEndScans.addAll(makeSomeScans(stopAtEndFile, 7, 0.1f, 2.5f));
-   IonTimeSeries<Scan> stopAtEndEic = new SimpleIonTimeSeries(null, makeFilledArray(11),
-   new double[]{0, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1}, stopAtEndScans);
-
-   int[][] expectedDataStopAtEnd = new int[][]{{14, 15, 16}, {0, 1, 2}};
-
-   Assertions.assertArrayEquals(expectedDataStopAtEnd,
-   TypeIICorrectionTask.getAlignedIndices(monoisotopicEic, 14, 17,
-   stopAtEndEic, 0, 3));
-   }
-   */
 
 }
