@@ -15,18 +15,15 @@
  * write to the Free Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
  */
 
-import com.google.common.collect.Range;
 import io.github.mzmine.datamodel.IsotopePattern;
 import io.github.mzmine.datamodel.IsotopePattern.IsotopePatternStatus;
-import io.github.mzmine.datamodel.MassSpectrumType;
-import io.github.mzmine.datamodel.PolarityType;
 import io.github.mzmine.datamodel.RawDataFile;
 import io.github.mzmine.datamodel.Scan;
 import io.github.mzmine.datamodel.featuredata.IonTimeSeries;
 import io.github.mzmine.datamodel.featuredata.impl.SimpleIonTimeSeries;
 import io.github.mzmine.datamodel.impl.SimpleIsotopePattern;
 import io.github.mzmine.datamodel.impl.SimpleScan;
-import io.github.mzmine.modules.dataprocessing.filter_typeiicorrection.TypeIICorrectionTask;
+import io.github.mzmine.modules.dataprocessing.filter_typeiicorrection.TypeIICorrectionUtils;
 import io.github.mzmine.parameters.parametertypes.tolerances.MZTolerance;
 import io.github.mzmine.project.impl.RawDataFileImpl;
 import java.util.ArrayList;
@@ -86,9 +83,7 @@ public class IsobaricOverlapCorrectionTest {
     List<Scan> scans = makeSomeScans(file, numScans, rtSteps, rtStart);
 
     //Creating the eic from the scans, mz and intenity values.
-    IonTimeSeries<Scan> eic = new SimpleIonTimeSeries(null, mzData, intensityData, scans);
-
-    return eic;
+    return new SimpleIonTimeSeries(null, mzData, intensityData, scans);
   }
 
 
@@ -100,19 +95,19 @@ public class IsobaricOverlapCorrectionTest {
         new double[]{1, 1, 1}, 1, IsotopePatternStatus.DETECTED, "test");
 
     //Testing a value the pattern contains.
-    Assertions.assertEquals(1,
-        TypeIICorrectionTask.getMatchingIndexInIsotopePattern(pattern, 2, new MZTolerance(0.1, 0)));
+    Assertions.assertEquals(1, TypeIICorrectionUtils.getMatchingIndexInIsotopePattern(pattern, 2,
+        new MZTolerance(0.1, 0)));
 
     //Testing a value the pattern doesn't contain.
-    Assertions.assertEquals(-1, TypeIICorrectionTask.getMatchingIndexInIsotopePattern(pattern, 1.5,
+    Assertions.assertEquals(-1, TypeIICorrectionUtils.getMatchingIndexInIsotopePattern(pattern, 1.5,
         new MZTolerance(0.1, 0)));
 
     //Testing the tolerance.
-    Assertions.assertEquals(2, TypeIICorrectionTask.getMatchingIndexInIsotopePattern(pattern, 3.1,
+    Assertions.assertEquals(2, TypeIICorrectionUtils.getMatchingIndexInIsotopePattern(pattern, 3.1,
         new MZTolerance(0.1, 0)));
 
     Assertions.assertNotEquals(2,
-        TypeIICorrectionTask.getMatchingIndexInIsotopePattern(pattern, 3.11,
+        TypeIICorrectionUtils.getMatchingIndexInIsotopePattern(pattern, 3.11,
             new MZTolerance(0.1, 0)));
   }
 
@@ -123,13 +118,13 @@ public class IsobaricOverlapCorrectionTest {
     IonTimeSeries<Scan> eic = createEic(30, 0.1f, 0f, null, null);
 
     //Testing the expected value.
-    Assertions.assertEquals(1, TypeIICorrectionTask.getIndexForRt(eic, 0.1f));
+    Assertions.assertEquals(1, TypeIICorrectionUtils.getIndexForRt(eic, 0.1f));
 
     //Testing a value out of range.
-    Assertions.assertEquals(-1, TypeIICorrectionTask.getIndexForRt(eic, 3.1f));
+    Assertions.assertEquals(-1, TypeIICorrectionUtils.getIndexForRt(eic, 3.1f));
 
     //Testing an invalid value.
-    Assertions.assertEquals(-1, TypeIICorrectionTask.getIndexForRt(eic, -0.1f));
+    Assertions.assertEquals(-1, TypeIICorrectionUtils.getIndexForRt(eic, -0.1f));
   }
 
   @Test
@@ -141,10 +136,11 @@ public class IsobaricOverlapCorrectionTest {
     //Creating an eic for the overlap feature.
     IonTimeSeries<Scan> overlapEic = createEic(31, 0.1f, 1.5f, null, null);
 
-    Assertions.assertTrue(TypeIICorrectionTask.rtsMatching(monoisotopicEic, 15, 30, overlapEic, 0));
+    Assertions.assertTrue(
+        TypeIICorrectionUtils.rtsMatching(monoisotopicEic, 15, 30, overlapEic, 0));
 
     Assertions.assertFalse(
-        TypeIICorrectionTask.rtsMatching(monoisotopicEic, 15, 30, overlapEic, 1));
+        TypeIICorrectionUtils.rtsMatching(monoisotopicEic, 15, 30, overlapEic, 1));
   }
 
   @Test
@@ -175,17 +171,17 @@ public class IsobaricOverlapCorrectionTest {
 
     //Testing a feature that overlaps at the beginning of the monoisotopic feature.
     Assertions.assertArrayEquals(correctedIntensities1,
-        TypeIICorrectionTask.subtractIsotopeIntensities(monoisotopicEic, 0, overlapEic1, 3, 5,
+        TypeIICorrectionUtils.subtractIsotopeIntensities(monoisotopicEic, 0, overlapEic1, 3, 5,
             relIsotopeIntensity));
 
     //Testing a feature that completely overlaps with the monoisotopic feature.
     Assertions.assertArrayEquals(correctedIntensities2,
-        TypeIICorrectionTask.subtractIsotopeIntensities(monoisotopicEic, 4, overlapEic2, 0, 5,
+        TypeIICorrectionUtils.subtractIsotopeIntensities(monoisotopicEic, 4, overlapEic2, 0, 5,
             relIsotopeIntensity));
 
     //Testing a feature that overlaps at the end of the monoisotopic feature.
     Assertions.assertArrayEquals(correctedIntensities3,
-        TypeIICorrectionTask.subtractIsotopeIntensities(monoisotopicEic, 12, overlapEic3, 0, 3,
+        TypeIICorrectionUtils.subtractIsotopeIntensities(monoisotopicEic, 12, overlapEic3, 0, 3,
             relIsotopeIntensity));
   }
 

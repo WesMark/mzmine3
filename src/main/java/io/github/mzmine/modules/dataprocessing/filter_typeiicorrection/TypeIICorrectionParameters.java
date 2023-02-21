@@ -19,25 +19,27 @@ package io.github.mzmine.modules.dataprocessing.filter_typeiicorrection;
 
 import io.github.mzmine.parameters.Parameter;
 import io.github.mzmine.parameters.impl.SimpleParameterSet;
+import io.github.mzmine.parameters.parametertypes.DoubleParameter;
+import io.github.mzmine.parameters.parametertypes.IntegerParameter;
 import io.github.mzmine.parameters.parametertypes.OriginalFeatureListHandlingParameter;
 import io.github.mzmine.parameters.parametertypes.selectors.FeatureListsParameter;
+import java.text.DecimalFormat;
 
 public class TypeIICorrectionParameters extends SimpleParameterSet {
 
-  /*
-   * Define any parameters here (see io.github.mzmine.parameters for parameter types)
-   * static is needed here to use this parameter as a key to lookup values
-   */
   public static final FeatureListsParameter featureLists = new FeatureListsParameter();
 
   public static final OriginalFeatureListHandlingParameter handleOriginal = new OriginalFeatureListHandlingParameter(
       false);
 
+  public static final DoubleParameter mergeWidth = new DoubleParameter("Merge Width",
+      "Resolution of the calculated isotope pattern.", new DecimalFormat("0.000"), 0.005);
+
+  public static final IntegerParameter areaCutoff = new IntegerParameter("Area Cutoff",
+      "Area cutoff for the corrected features.", 100);
+
   public TypeIICorrectionParameters() {
-    /*
-     * The order of the parameters is used to construct the parameter dialog automatically
-     */
-    super(new Parameter[]{featureLists});
+    super(new Parameter[]{featureLists, handleOriginal, mergeWidth, areaCutoff});
   }
 
 }
