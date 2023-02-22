@@ -31,15 +31,27 @@ import java.util.List;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class IsobaricOverlapCorrectionTest {
+public class TypeIIOverlapCorrectionTest {
 
-  public List<Scan> makeSomeScans(RawDataFile file, int numScans, float rtFactor, float rtShift) {
+  /**
+   * Creates an list of empty scans with just retention time data.
+   *
+   * @param numScans   The number of scans to be generated.
+   * @param rtStart    The retention time in min for the first scan.
+   * @param rtStepSize The step size between the retention times of the scans.
+   * @return Returns a list of scans with just retention time data.
+   */
+  private List<Scan> makeSomeScans(int numScans, float rtStart, float rtStepSize) {
 
+    //Create raw data file to generate scans.
+    RawDataFile file = new RawDataFileImpl("file", null, null);
+
+    //Initialize list to add the scans to.
     List<Scan> scans = new ArrayList<>();
 
     //Creating scans with just the rts added to them.
     for (int i = 0; i < numScans; i++) {
-      SimpleScan scan = new SimpleScan(file, i, 1, i * rtFactor + rtShift, null, null, null, null,
+      SimpleScan scan = new SimpleScan(file, i, 1, i * rtStepSize + rtStart, null, null, null, null,
           null, "test", null);
 
       scans.add(scan);
@@ -47,7 +59,13 @@ public class IsobaricOverlapCorrectionTest {
     return scans;
   }
 
-  public double[] createFilledArray(int arrayLength) {
+  /**
+   * Creates a double array of a given size filled with the value 1.
+   *
+   * @param arrayLength The length of the array to be created.
+   * @return Returns a double array of the desired length filled with the value 1.
+   */
+  private double[] createFilledArray(int arrayLength) {
 
     //Filling an array of the length arrayLength with the value 1.
     double[] outputArray = new double[arrayLength];
@@ -57,7 +75,20 @@ public class IsobaricOverlapCorrectionTest {
     return outputArray;
   }
 
-  public IonTimeSeries<Scan> createEic(int numScans, float rtSteps, float rtStart, double[] mzs,
+  /**
+   * Creates an EIC containing the given data for the retention times, the m/z- and
+   * intensity-values.
+   *
+   * @param numScans    The number of scans the EIC should contain.
+   * @param rtStepSize  The step size between the retention times of the scans
+   * @param rtStart     The retention time in min for the first scan.
+   * @param mzs         The m/z-values for the EIC.
+   * @param intensities The intensity-values for the EIC.
+   * @return Returns an EIC containing the given data for the retention times, the m/z- and
+   * intensity-values. If the parameters mzs or intensities are null the corresponding values will
+   * be set to 1.
+   */
+  private IonTimeSeries<Scan> createEic(int numScans, float rtStepSize, float rtStart, double[] mzs,
       double[] intensities) {
 
     //Creating arrays for the mz and intensity values.
@@ -79,14 +110,15 @@ public class IsobaricOverlapCorrectionTest {
     }
 
     //Creating scans for the given rt spacing.
-    RawDataFile file = new RawDataFileImpl("file", null, null);
-    List<Scan> scans = makeSomeScans(file, numScans, rtSteps, rtStart);
+    List<Scan> scans = makeSomeScans(numScans, rtStart, rtStepSize);
 
     //Creating the eic from the scans, mz and intenity values.
     return new SimpleIonTimeSeries(null, mzData, intensityData, scans);
   }
 
-
+  /**
+   * Check that the correct index is picked from the isotope pattern.
+   */
   @Test
   void testGetMatchingIndexInIsotopePattern() {
 
@@ -111,6 +143,9 @@ public class IsobaricOverlapCorrectionTest {
             new MZTolerance(0.1, 0)));
   }
 
+  /**
+   * Check that the correct index is picked for a give retention time.
+   */
   @Test
   void testGetIndexForRt() {
 
@@ -127,6 +162,9 @@ public class IsobaricOverlapCorrectionTest {
     Assertions.assertEquals(-1, TypeIICorrectionUtils.getIndexForRt(eic, -0.1f));
   }
 
+  /**
+   * Check if matching retention times are correctly recognized.
+   */
   @Test
   void testCheckIfRtMatch() {
 
@@ -143,6 +181,9 @@ public class IsobaricOverlapCorrectionTest {
         TypeIICorrectionUtils.rtsMatching(monoisotopicEic, 15, 30, overlapEic, 1));
   }
 
+  /**
+   * Check if overlapping signals are correctly subtracted.
+   */
   @Test
   void testSubtractIsotopeIntensity() {
 
@@ -171,19 +212,17 @@ public class IsobaricOverlapCorrectionTest {
 
     //Testing a feature that overlaps at the beginning of the monoisotopic feature.
     Assertions.assertArrayEquals(correctedIntensities1,
-        TypeIICorrectionUtils.subtractIsotopeIntensities(monoisotopicEic, 0, overlapEic1, 3, 5,
-            relIsotopeIntensity));
+        TypeIICorrectionUtils.subtractIsotopeIntensities(monoisotopicEic, 0, relIsotopeIntensity,
+            overlapEic1, 3, 5));
 
     //Testing a feature that completely overlaps with the monoisotopic feature.
     Assertions.assertArrayEquals(correctedIntensities2,
-        TypeIICorrectionUtils.subtractIsotopeIntensities(monoisotopicEic, 4, overlapEic2, 0, 5,
-            relIsotopeIntensity));
+        TypeIICorrectionUtils.subtractIsotopeIntensities(monoisotopicEic, 4, relIsotopeIntensity,
+            overlapEic2, 0, 5));
 
     //Testing a feature that overlaps at the end of the monoisotopic feature.
     Assertions.assertArrayEquals(correctedIntensities3,
-        TypeIICorrectionUtils.subtractIsotopeIntensities(monoisotopicEic, 12, overlapEic3, 0, 3,
-            relIsotopeIntensity));
+        TypeIICorrectionUtils.subtractIsotopeIntensities(monoisotopicEic, 12, relIsotopeIntensity,
+            overlapEic3, 0, 3));
   }
-
-
 }

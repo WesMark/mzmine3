@@ -53,7 +53,7 @@ public class TypeIICorrectionTask extends AbstractTask {
   private final MZmineProject project;
   private final ModularFeatureList originalFeatureList;
   private ModularFeatureList processedFeatureList;
-  private final MZTolerance featureToPatternMzTol = new MZTolerance(0.005, 5);
+  private final MZTolerance featureToPatternMzTol;
   private final OriginalFeatureListOption handleOriginal;
   private final int areaCutoff;
   private final double mergeWidth;
@@ -71,7 +71,7 @@ public class TypeIICorrectionTask extends AbstractTask {
    * Constructor used to extract all parameters
    *
    * @param project        the current MZmineProject
-   * @param featureList    runs this taks on this featureList
+   * @param featureList    runs this task on this featureList
    * @param parameters     user parameters
    * @param storage        memory mapping is only used for memory intensive data that should be
    *                       stored for later processing - like spectra, feature data, ... so storage
@@ -90,6 +90,7 @@ public class TypeIICorrectionTask extends AbstractTask {
     handleOriginal = parameters.getValue(TypeIICorrectionParameters.handleOriginal);
     mergeWidth = parameters.getValue(TypeIICorrectionParameters.mergeWidth);
     areaCutoff = parameters.getValue(TypeIICorrectionParameters.areaCutoff);
+    featureToPatternMzTol = parameters.getValue(TypeIICorrectionParameters.mzTolerance);
   }
 
   @Override
@@ -116,8 +117,8 @@ public class TypeIICorrectionTask extends AbstractTask {
     processedFeatureList = correctTypIIOverlapOfFeatureList();
 
     //Reflecting the new feature list to the project.
-    handleOriginal.reflectNewFeatureListToProject("typeII", project, processedFeatureList,
-        originalFeatureList);
+    handleOriginal.reflectNewFeatureListToProject(" type-II-corrected", project,
+        processedFeatureList, originalFeatureList);
 
     //Logging statistics.
     logger.info(
@@ -127,22 +128,28 @@ public class TypeIICorrectionTask extends AbstractTask {
     // add to project
     addAppliedMethodsAndResultToProject();
 
+    //Setting the task status to finished.
     logger.info("Finished on " + originalFeatureList);
     setStatus(TaskStatus.FINISHED);
   }
 
-
+  /**
+   * Corrects the type-II-overlap for the entire feature list. For an aligned feature list the
+   * overlap will be corrected file by file and not row by row.
+   *
+   * @return Returns the corrected feature list.
+   */
   private ModularFeatureList correctTypIIOverlapOfFeatureList() {
 
     //Creating a copy of the used Feature List.
     processedFeatureList = originalFeatureList.createCopy(
-        originalFeatureList.getName() + " type2corr", getMemoryMapStorage(), false);
+        originalFeatureList.getName() + " type-II-corrected", getMemoryMapStorage(), false);
 
     //Extracting raw data files used in the feature List.
     final List<RawDataFile> rawDataFiles = processedFeatureList.getRawDataFiles();
 
     //Getting rows from the feature List.
-    List<FeatureListRow> rows = processedFeatureList.getRows();
+    final List<FeatureListRow> rows = processedFeatureList.getRows();
     rows.sort(FeatureListRowSorter.MZ_ASCENDING);
 
     //Loop going over all the raw data files used in the feature list.
@@ -154,6 +161,12 @@ public class TypeIICorrectionTask extends AbstractTask {
     return processedFeatureList;
   }
 
+  /**
+   * Removes the type-II-overlap for all the feature of the given file.
+   *
+   * @param file The raw data file which features will be corrected.
+   * @param rows All the rows of the given feature list.
+   */
   private void correctTypeIIOverlapOfFile(RawDataFile file, List<FeatureListRow> rows) {
 
     //Loop going over all the rows of a given raw data file of the feature list.
@@ -164,13 +177,13 @@ public class TypeIICorrectionTask extends AbstractTask {
 
       //Getting the feature from the row for the given raw data file.
       //Continuing with the next row, if there is no feature for this row in the given raw data file.
-      ModularFeature monoisotopicFeature = (ModularFeature) row.getFeature(file);
+      final ModularFeature monoisotopicFeature = (ModularFeature) row.getFeature(file);
       if (monoisotopicFeature == null) {
         continue;
       }
 
       //Calculating the predicted isotope pattern for the features charged molecular formula.
-      IsotopePattern isotopePattern = TypeIICorrectionUtils.getIsotopePatternForFeature(
+      final IsotopePattern isotopePattern = TypeIICorrectionUtils.getIsotopePatternForFeature(
           monoisotopicFeature, mergeWidth);
       if (isotopePattern == null) {
         continue;
@@ -183,20 +196,34 @@ public class TypeIICorrectionTask extends AbstractTask {
     }
   }
 
+  /**
+   * Removes the type-II-overlap for the given feature.
+   *
+   * @param monoisotopicFeature The feature that causes the overlap.
+   * @param file                The raw data file that contains the monoisotopic feature.
+   * @param rows                The rows of the feature list.
+   * @param isotopePattern      The isotope pattern of the monoisotopic feature.
+   */
   private void correctTypeIIOverlapOfFeature(ModularFeature monoisotopicFeature, RawDataFile file,
       List<FeatureListRow> rows, IsotopePattern isotopePattern) {
 
-    Range<Double> totalIsotopePatternMzRange = featureToPatternMzTol.getToleranceRange(
+    //The mz range for the monoisotopic features isotope pattern.
+    final Range<Double> totalIsotopePatternMzRange = featureToPatternMzTol.getToleranceRange(
         isotopePattern.getDataPointMZRange());
 
-    int index = rows.indexOf(monoisotopicFeature.getRow());
+    //The index for the monoisotopic feature in the list of rows.
+    int monoisotopicFeatureIndex = rows.indexOf(monoisotopicFeature.getRow());
 
-    for (int i = index + 1; i < rows.size() - 1; i++) {
+    //Loop going over all the following features until th features mz is bigger than the isotope pattern mz range.
+    while (monoisotopicFeatureIndex < rows.size() - 1) {
+
+      //Incrementing the index to get the following row.
+      monoisotopicFeatureIndex++;
 
       //Getting the feature from the following row.
       //Checking weather there is a feature in the following row for the given raw data file.
-      FeatureListRow followingRow = rows.get(i);
-      ModularFeature overlapFeature = (ModularFeature) followingRow.getFeature(file);
+      final FeatureListRow followingRow = rows.get(monoisotopicFeatureIndex);
+      final ModularFeature overlapFeature = (ModularFeature) followingRow.getFeature(file);
       if (overlapFeature == null) {
         continue;
       }
@@ -209,38 +236,37 @@ public class TypeIICorrectionTask extends AbstractTask {
 
       //Checking weather the retention times of the given feature and the following feature overlap.
       //Continuing with the next row if they don't overlap.
-      if (!monoisotopicFeature.getRawDataPointsRTRange()
-          .isConnected(overlapFeature.getRawDataPointsRTRange())) {
+      if (!monoisotopicFeature.getRawDataPointsRTRange().isConnected(overlapFeature.getRawDataPointsRTRange())) {
         continue;
       }
 
       //Checking weather the overlap feature mz overlaps with the isotope pattern in a given mz range.
-      int isotopePatternIndex = TypeIICorrectionUtils.getMatchingIndexInIsotopePattern(
+      final int isotopePatternIndex = TypeIICorrectionUtils.getMatchingIndexInIsotopePattern(
           isotopePattern, overlapFeature.getMZ(), featureToPatternMzTol);
       if (isotopePatternIndex == -1) {
         continue;
       }
 
       // Getting feature intensity data both overlapping features.
-      IonTimeSeries<? extends Scan> monoisotopicEic = monoisotopicFeature.getFeatureData();
-      IonTimeSeries<? extends Scan> overlapEic = overlapFeature.getFeatureData();
+      final IonTimeSeries<? extends Scan> monoisotopicEic = monoisotopicFeature.getFeatureData();
+      final IonTimeSeries<? extends Scan> overlapEic = overlapFeature.getFeatureData();
 
       //Getting the overlapping rt region.
-      Range<Float> featuresRtIntersection = monoisotopicFeature.getRawDataPointsRTRange()
+      final Range<Float> featuresRtIntersection = monoisotopicFeature.getRawDataPointsRTRange()
           .intersection(overlapFeature.getRawDataPointsRTRange());
-      float lowerRtOverlap = featuresRtIntersection.lowerEndpoint();
-      float upperRtOverlap = featuresRtIntersection.upperEndpoint();
+      final float lowerRtOverlap = featuresRtIntersection.lowerEndpoint();
+      final float upperRtOverlap = featuresRtIntersection.upperEndpoint();
 
       //The indices for the overlap region of the monoisotopic feature.
-      int monoisotopicFeatureLowerIndex = TypeIICorrectionUtils.getIndexForRt(monoisotopicEic,
+      final int monoisotopicFeatureLowerIndex = TypeIICorrectionUtils.getIndexForRt(monoisotopicEic,
           lowerRtOverlap);
-      int monoisotopicFeatureUpperIndex = TypeIICorrectionUtils.getIndexForRt(monoisotopicEic,
+      final int monoisotopicFeatureUpperIndex = TypeIICorrectionUtils.getIndexForRt(monoisotopicEic,
           upperRtOverlap);
 
       //The indices for the overlap region of the overlap feature.
-      int overlapFeatureLowerIndex = TypeIICorrectionUtils.getIndexForRt(overlapEic,
+      final int overlapFeatureLowerIndex = TypeIICorrectionUtils.getIndexForRt(overlapEic,
           lowerRtOverlap);
-      int overlapFeatureUpperIndex = TypeIICorrectionUtils.getIndexForRt(overlapEic,
+      final int overlapFeatureUpperIndex = TypeIICorrectionUtils.getIndexForRt(overlapEic,
           upperRtOverlap);
 
       //Checking weather there are jumps in the retention times between the two features.
@@ -254,34 +280,45 @@ public class TypeIICorrectionTask extends AbstractTask {
       }
 
       //Calculating the relative intensity of the monoisotopic features isotope.
-      IsotopePattern relativeIsotopePattern = isotopePattern.getRelativeIntensityCopy();
+      final IsotopePattern relativeIsotopePattern = isotopePattern.getRelativeIntensityCopy();
       final double relativeIsotopeIntensity = relativeIsotopePattern.getIntensityValue(
           isotopePatternIndex);
 
-      double[] correctedIntensities = TypeIICorrectionUtils.subtractIsotopeIntensities(
-          monoisotopicEic, monoisotopicFeatureLowerIndex, overlapEic, overlapFeatureLowerIndex,
-          overlapFeatureUpperIndex, relativeIsotopeIntensity);
+      //Correcting the type-II-overlap for the found overlap feature.
+      final double[] correctedIntensities = TypeIICorrectionUtils.subtractIsotopeIntensities(
+          monoisotopicEic, monoisotopicFeatureLowerIndex, relativeIsotopeIntensity, overlapEic,
+          overlapFeatureLowerIndex, overlapFeatureUpperIndex);
 
+      //Adding the corrected intensitys to the overlap feature.
       addCorrectedIntensitiesToFeature(overlapFeature, correctedIntensities, monoisotopicFeature);
+
+      //Removing the overlap feature if the corrected area ist below the area cutoff.
       removeFeatureBelowCutoff(overlapFeature, areaCutoff, processedFeatureList);
     }
   }
 
-
+  /**
+   * Adds the corrected intensity values to the feature.
+   *
+   * @param overlapFeature       The feature the corrected intensities will be added to.
+   * @param correctedIntensities The corrected intensities that will be added to the feature.
+   * @param monoisotopicFeature  The monoisotopic feature for logging purposes.
+   */
   private void addCorrectedIntensitiesToFeature(ModularFeature overlapFeature,
       double[] correctedIntensities, ModularFeature monoisotopicFeature) {
 
     //Extracting the overlap feature from the overlap eic.
-    IonTimeSeries<? extends Scan> overlapEic = overlapFeature.getFeatureData();
+    final IonTimeSeries<? extends Scan> overlapEic = overlapFeature.getFeatureData();
 
     //Getting overlap feature mz values.
-    double[] overlapFeatureMzs = overlapEic.getMzValues(new double[overlapEic.getNumberOfValues()]);
+    final double[] overlapFeatureMzs = overlapEic.getMzValues(
+        new double[overlapEic.getNumberOfValues()]);
 
     //Area of the overlap feature before correction for logging purposes.
-    double overlapFeatureArea = overlapFeature.getArea();
+    final double overlapFeatureArea = overlapFeature.getArea();
 
     //Writing the new intensities to the feature.
-    IonTimeSeries<? extends Scan> correctedOverlapEic = (IonTimeSeries<? extends Scan>) overlapEic.copyAndReplace(
+    final IonTimeSeries<? extends Scan> correctedOverlapEic = (IonTimeSeries<? extends Scan>) overlapEic.copyAndReplace(
         getMemoryMapStorage(), overlapFeatureMzs, correctedIntensities);
     overlapFeature.set(FeatureDataType.class, correctedOverlapEic);
 
@@ -292,7 +329,7 @@ public class TypeIICorrectionTask extends AbstractTask {
     FeatureDataUtils.recalculateIonSeriesDependingTypes(overlapFeature);
 
     //Area of the overlap feature after correction for logging purposes.
-    double correctedOverlapFeatureArea = overlapFeature.getArea();
+    final double correctedOverlapFeatureArea = overlapFeature.getArea();
 
     //Increasing the counter for logging the total number of changed features.
     changedFeatures++;
@@ -304,16 +341,26 @@ public class TypeIICorrectionTask extends AbstractTask {
             + " to " + correctedOverlapFeatureArea);
   }
 
-
+  /**
+   * Removes a feature if its corrected area is below the area cutoff. Also removes rows if all
+   * contained features were removed.
+   *
+   * @param overlapFeature       The feature to be removed if below cutoff.
+   * @param areaCutoff           The cutoff value for the features area.
+   * @param processedFeatureList The feature list the feature will be removed from.
+   */
   private void removeFeatureBelowCutoff(ModularFeature overlapFeature, int areaCutoff,
       ModularFeatureList processedFeatureList) {
 
-    FeatureListRow row = overlapFeature.getRow();
+    //The row of the overlap feature.
+    final FeatureListRow row = overlapFeature.getRow();
 
-    //Removing a feature if its corrected area is below 100.
+    //Removing a feature if its corrected area is below the area cutoff.
     if (overlapFeature.getArea() < areaCutoff) {
 
       row.removeFeature(overlapFeature.getRawDataFile());
+
+      //Incrementing the counters to log.
       removedFeatures++;
       changedFeatures--;
     }
