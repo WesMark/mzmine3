@@ -99,7 +99,7 @@
   <!-- RAW DATA METHODS -->
   <Menu text="Raw data methods">
     <Menu text="Raw data import">
-      <MenuItem onAction="#runModule" text="MS data (advanced)"
+      <MenuItem onAction="#runModule" text="Import MS data"
         userData="io.github.mzmine.modules.io.import_rawdata_all.AllSpectralDataImportModule">
         <accelerator>
           <KeyCodeCombination alt="UP" code="I"
@@ -311,6 +311,8 @@
         userData="io.github.mzmine.modules.dataprocessing.group_metacorrelate.export.ExportCorrAnnotationModule"/>
       <MenuItem text="Spectral library batch generation" onAction="#runModule"
         userData="io.github.mzmine.modules.io.spectraldbsubmit.batch.LibraryBatchGenerationModule"/>
+      <MenuItem text="FeatureML" onAction="#runModule"
+        userData="io.github.mzmine.modules.io.export_features_featureML.FeatureMLExportModularModule"/>
     </Menu>
 
     <Menu text="Processing">
@@ -318,6 +320,8 @@
         userData="io.github.mzmine.modules.dataprocessing.filter_groupms2.GroupMS2Module"/>
       <MenuItem onAction="#runModule" text="Assign DIA pseudo spectra to features (experimental)"
         userData="io.github.mzmine.modules.dataprocessing.filter_diams2.DiaMs2CorrModule"/>
+      <MenuItem onAction="#runModule" text="Refine fragmentation scans of features"
+        userData="io.github.mzmine.modules.dataprocessing.filter_groupms2_refine.GroupedMs2RefinementModule"/>
       <MenuItem onAction="#runModule"
         text="Internal reference CCS calibration"
         userData="io.github.mzmine.modules.dataprocessing.id_ccscalibration.reference.ReferenceCCSCalibrationModule"/>
@@ -342,7 +346,7 @@
     </Menu>
 
     <Menu text="Feature grouping">
-      <MenuItem text="metaCorrelate (corrGroup)" onAction="#runModule"
+      <MenuItem text="Correlation grouping (metaCorrelate)" onAction="#runModule"
         userData="io.github.mzmine.modules.dataprocessing.group_metacorrelate.corrgrouping.CorrelateGroupingModule"/>
       <MenuItem text="MS/MS spectral networking" onAction="#runModule"
         userData="io.github.mzmine.modules.dataprocessing.group_metacorrelate.msms.similarity.MS2SimilarityModule"/>
@@ -574,9 +578,10 @@
       onAction="#runModule"
       userData="io.github.mzmine.modules.tools.isotopepatternpreview.IsotopePatternPreviewModule"/>
     <MenuItem onAction="#showSpectralMirrorDialog" text="Spectral mirror (USI enabled)"/>
-    <MenuItem text="Kovats index extraction"
-      onAction="#runModule"
-      userData="io.github.mzmine.modules.tools.kovats.KovatsIndexExtractionModule"/>
+<!--    There is an exception with a combobox value being null in the dialog. not sure how to fix -->
+<!--    <MenuItem text="Kovats index extraction"-->
+<!--      onAction="#runModule"-->
+<!--      userData="io.github.mzmine.modules.tools.kovats.KovatsIndexExtractionModule"/>-->
     <MenuItem text="Calculate quality parameters"
       onAction="#runModule"
       userData="io.github.mzmine.modules.tools.qualityparameters.QualityParametersModule"/>

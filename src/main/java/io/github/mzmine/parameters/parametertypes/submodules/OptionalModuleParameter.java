@@ -25,10 +25,10 @@
 
 package io.github.mzmine.parameters.parametertypes.submodules;
 
-import io.github.mzmine.modules.io.projectsave.RawDataSavingUtils;
 import io.github.mzmine.parameters.Parameter;
 import io.github.mzmine.parameters.ParameterContainer;
 import io.github.mzmine.parameters.ParameterSet;
+import io.github.mzmine.parameters.ParameterUtils;
 import io.github.mzmine.parameters.UserParameter;
 import io.github.mzmine.parameters.parametertypes.EmbeddedParameterSet;
 import java.util.Collection;
@@ -40,7 +40,8 @@ import org.w3c.dom.Element;
  * Parameter represented by check box with additional sub-module
  */
 public class OptionalModuleParameter<T extends ParameterSet> implements
-    UserParameter<Boolean, OptionalModuleComponent>, ParameterContainer, EmbeddedParameterSet {
+    UserParameter<Boolean, OptionalModuleComponent>, ParameterContainer,
+    EmbeddedParameterSet<T, Boolean> {
 
   private final String name;
   private final String description;
@@ -166,7 +167,7 @@ public class OptionalModuleParameter<T extends ParameterSet> implements
       return false;
     }
 
-    return RawDataSavingUtils.parameterSetsEqual(getEmbeddedParameters(),
-        thatOpt.getEmbeddedParameters(), false, false);
+    return ParameterUtils.equalValues(getEmbeddedParameters(), thatOpt.getEmbeddedParameters(),
+        false, false);
   }
 }
