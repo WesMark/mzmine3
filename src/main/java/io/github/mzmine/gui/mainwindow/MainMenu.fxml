@@ -446,6 +446,9 @@
     </Menu>
 
     <Menu text="Annotation">
+       <MenuItem text="Mean Feature Intensity"
+              onAction="#runModule"
+              userData="io.github.mzmine.modules.dataprocessing.id_mean.MeanModule"/>
       <Menu text="Search precursor mass">
         <MenuItem text="Local compound database (CSV) search"
           onAction="#runModule"
