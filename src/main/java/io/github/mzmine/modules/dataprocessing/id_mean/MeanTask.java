@@ -30,6 +30,7 @@ import io.github.mzmine.datamodel.features.Feature;
 import io.github.mzmine.datamodel.features.FeatureListRow;
 import io.github.mzmine.datamodel.features.ModularFeatureList;
 import io.github.mzmine.datamodel.features.types.numbers.MeanIntensityType;
+import io.github.mzmine.datamodel.features.types.numbers.RsdType;
 import io.github.mzmine.parameters.ParameterSet;
 import io.github.mzmine.taskcontrol.AbstractTask;
 import io.github.mzmine.taskcontrol.TaskStatus;
@@ -76,12 +77,31 @@ public class MeanTask extends AbstractTask {
           continue;
         }
 
-        float area = feature.getArea();
+        //Number of scans in the feature.
         int numScans = feature.getNumberOfDataPoints();
 
-        float meanIntensity = (area / numScans);
+        //Sum of all the feature scans intensities.
+        double[] intensities = new double[numScans];
+        feature.getFeatureData().getIntensityValues(intensities);
+        double sumIntensity = Arrays.stream(intensities).sum();
+
+        //Features mean intensity.
+        double meanIntensity = sumIntensity / numScans;
 
         row.set(MeanIntensityType.class, meanIntensity);
+
+        //RSD
+        double sumDeviation = 0;
+        for (double intensity : intensities) {
+
+          double deviation = Math.pow(intensity - meanIntensity, 2d);
+          sumDeviation += deviation;
+        }
+
+        double sd = Math.sqrt(sumDeviation / numScans);
+        double rsd = sd / meanIntensity;
+
+        row.set(RsdType.class, rsd);
       }
 
       processed++;

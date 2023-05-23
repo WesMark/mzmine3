@@ -30,22 +30,22 @@ import java.text.DecimalFormat;
 import java.text.NumberFormat;
 import org.jetbrains.annotations.NotNull;
 
-public class MeanIntensityType extends DoubleType {
+public class RsdType extends DoubleType {
 
-  private static final DecimalFormat format = new DecimalFormat("0.00");
+  private static final DecimalFormat format = new DecimalFormat("0.000");
 
-  public MeanIntensityType() {
+  public RsdType() {
     super(format);
   }
 
   @Override
   public @NotNull String getUniqueID() {
-    return "mean intensity";
+    return "mean intensities rsd";
   }
 
   @Override
   public @NotNull String getHeaderString() {
-    return "Mean Intensity";
+    return "RSD";
   }
 
   @Override

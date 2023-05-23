@@ -84,7 +84,8 @@ public class ParameterSetParameter<SUB extends ParameterSet> implements
   }
 
   @Override
-  public void setValueToComponent(final OptionalModuleComponent component, final @Nullable SUB parameters) {
+  public void setValueToComponent(final OptionalModuleComponent component,
+      final @Nullable SUB parameters) {
     component.setParameterValuesToComponents();
   }
 
