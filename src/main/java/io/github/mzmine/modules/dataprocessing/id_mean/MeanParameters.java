@@ -32,7 +32,6 @@ import io.github.mzmine.parameters.parametertypes.filenames.FileNameParameter;
 import io.github.mzmine.parameters.parametertypes.filenames.FileSelectionType;
 import io.github.mzmine.parameters.parametertypes.selectors.FeatureListsParameter;
 import io.github.mzmine.parameters.parametertypes.submodules.OptionalModuleParameter;
-import io.github.mzmine.parameters.parametertypes.tolerances.MZToleranceParameter;
 import java.text.DecimalFormat;
 
 public class MeanParameters extends SimpleParameterSet {
@@ -44,7 +43,7 @@ public class MeanParameters extends SimpleParameterSet {
       "Export", "Export the mean intensity and the rsd", new MeanExportParameters());
 
   public MeanParameters() {
-    super(new Parameter[]{featureList});
+    super(new Parameter[]{featureList, export});
   }
 
 }
@@ -54,10 +53,14 @@ class MeanExportParameters extends SimpleParameterSet {
   public static final DoubleParameter mz = new DoubleParameter("m/z",
       "The features m/z value that will be exported.", new DecimalFormat("0.0000"));
 
-  public static final MZToleranceParameter mzTolerance = new MZToleranceParameter("m/z tolerance",
-      "The tolerance for the features around the entered m/z-value");
+  public static final DoubleParameter mzTolerance = new DoubleParameter("m/z tolerance",
+      "The tolerance for the features around the entered m/z-value", new DecimalFormat("0.0000"));
 
   public static final FileNameParameter file = new FileNameParameter("File Path",
       "The file pathe the values will be exported to", FileSelectionType.SAVE);
 
+
+  public MeanExportParameters() {
+    super(new Parameter[]{mz, mzTolerance, file});
+  }
 }

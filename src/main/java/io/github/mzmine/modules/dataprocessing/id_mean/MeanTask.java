@@ -34,6 +34,7 @@ import io.github.mzmine.datamodel.features.types.numbers.RsdType;
 import io.github.mzmine.parameters.ParameterSet;
 import io.github.mzmine.taskcontrol.AbstractTask;
 import io.github.mzmine.taskcontrol.TaskStatus;
+import java.io.File;
 import java.time.Instant;
 import java.util.Arrays;
 import org.jetbrains.annotations.NotNull;
@@ -41,6 +42,13 @@ import org.jetbrains.annotations.NotNull;
 public class MeanTask extends AbstractTask {
 
   private final ModularFeatureList[] featureLists;
+
+  private final double mz;
+
+  private final double mzTolerance;
+
+  private final File file;
+
   private final int numRows;
   private int processed;
 
@@ -49,6 +57,18 @@ public class MeanTask extends AbstractTask {
 
     featureLists = parameters.getValue(MeanParameters.featureList).getMatchingFeatureLists();
     numRows = Arrays.stream(featureLists).mapToInt(ModularFeatureList::getNumberOfRows).sum();
+
+    if (parameters.getValue(MeanParameters.export)) {
+
+      mz = parameters.getValue(MeanExportParameters.mz);
+      mzTolerance = parameters.getValue(MeanExportParameters.mzTolerance);
+      file = parameters.getValue(MeanExportParameters.file);
+
+    } else {
+      mz = 0;
+      mzTolerance = 0;
+      file = null;
+    }
   }
 
   @Override
@@ -71,7 +91,6 @@ public class MeanTask extends AbstractTask {
       for (FeatureListRow row : featureList.getRows()) {
 
         Feature feature = row.getBestFeature();
-
         if (feature == null || feature.getFeatureStatus() == FeatureStatus.UNKNOWN) {
           processed++;
           continue;
@@ -80,27 +99,16 @@ public class MeanTask extends AbstractTask {
         //Number of scans in the feature.
         int numScans = feature.getNumberOfDataPoints();
 
-        //Sum of all the feature scans intensities.
+        //Features intensities.
         double[] intensities = new double[numScans];
         feature.getFeatureData().getIntensityValues(intensities);
-        double sumIntensity = Arrays.stream(intensities).sum();
 
-        //Features mean intensity.
-        double meanIntensity = sumIntensity / numScans;
-
+        //Mean intensity.
+        double meanIntensity = calculateMeanIntensity(intensities, numScans);
         row.set(MeanIntensityType.class, meanIntensity);
 
         //RSD
-        double sumDeviation = 0;
-        for (double intensity : intensities) {
-
-          double deviation = Math.pow(intensity - meanIntensity, 2d);
-          sumDeviation += deviation;
-        }
-
-        double sd = Math.sqrt(sumDeviation / numScans);
-        double rsd = sd / meanIntensity;
-
+        double rsd = calculateRSD(intensities, meanIntensity, numScans);
         row.set(RsdType.class, rsd);
       }
 
@@ -108,5 +116,24 @@ public class MeanTask extends AbstractTask {
     }
 
     setStatus(TaskStatus.FINISHED);
+  }
+
+  private double calculateRSD(double[] intensities, double meanIntensity, int numScans) {
+
+    double sumDeviation = 0;
+    for (double intensity : intensities) {
+
+      double deviation = Math.pow(intensity - meanIntensity, 2d);
+      sumDeviation += deviation;
+    }
+
+    double sd = Math.sqrt(sumDeviation / numScans);
+    return sd / meanIntensity;
+  }
+
+  private double calculateMeanIntensity(double[] intensities, int numScans) {
+
+    double sumIntensity = Arrays.stream(intensities).sum();
+    return sumIntensity / numScans;
   }
 }
