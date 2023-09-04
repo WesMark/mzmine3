@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2022 The MZmine Development Team
+ * Copyright (c) 2004-2023 The MZmine Development Team
  *
  * Permission is hereby granted, free of charge, to any person
  * obtaining a copy of this software and associated documentation
@@ -27,6 +27,7 @@ package io.github.mzmine.util.spectraldb.entry;
 
 import com.google.common.collect.Range;
 import io.github.mzmine.datamodel.DataPoint;
+import io.github.mzmine.datamodel.MZmineProject;
 import io.github.mzmine.datamodel.MassList;
 import io.github.mzmine.datamodel.MergedMassSpectrum;
 import io.github.mzmine.datamodel.PolarityType;
@@ -165,8 +166,9 @@ public interface SpectralLibraryEntry extends MassList {
     return precursors.stream().map(extractor).filter(Objects::nonNull).toList();
   }
 
-  static SpectralLibraryEntry loadFromXML(XMLStreamReader reader) throws XMLStreamException {
-    return SpectralDBEntry.loadFromXML(reader);
+  static SpectralLibraryEntry loadFromXML(XMLStreamReader reader, MZmineProject project)
+      throws XMLStreamException {
+    return SpectralDBEntry.loadFromXML(reader, project);
   }
 
   void putAll(Map<DBEntryField, Object> fields);
@@ -240,9 +242,9 @@ public interface SpectralLibraryEntry extends MassList {
 
   default Float toFloat(Object v) {
     return switch (v) {
-      case null, default -> null;
       case Number n -> n.floatValue();
       case String s -> Float.parseFloat(s);
+      default -> null;
     };
   }
 
@@ -257,9 +259,9 @@ public interface SpectralLibraryEntry extends MassList {
 
   default Double toDouble(Object v) {
     return switch (v) {
-      case null, default -> null;
       case Number n -> n.doubleValue();
       case String s -> Double.parseDouble(s);
+      default -> null;
     };
   }
 
@@ -274,9 +276,15 @@ public interface SpectralLibraryEntry extends MassList {
 
   default Integer toInteger(Object v) {
     return switch (v) {
-      case null, default -> null;
       case Number n -> n.intValue();
       case String s -> Integer.parseInt(s);
+      default -> null;
     };
   }
+
+  @Nullable SpectralLibrary getLibrary();
+
+  void setLibrary(@Nullable SpectralLibrary library);
+
+  @Nullable String getLibraryName();
 }
