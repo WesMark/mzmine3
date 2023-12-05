@@ -32,6 +32,7 @@ import io.github.mzmine.main.MZmineCore;
 import io.github.mzmine.parameters.Parameter;
 import io.github.mzmine.parameters.dialogs.ParameterSetupDialog;
 import io.github.mzmine.parameters.impl.SimpleParameterSet;
+import io.github.mzmine.parameters.parametertypes.BooleanParameter;
 import io.github.mzmine.parameters.parametertypes.ComboParameter;
 import io.github.mzmine.parameters.parametertypes.MultiChoiceParameter;
 import io.github.mzmine.util.ExitCode;
@@ -77,6 +78,9 @@ public class FeaturesComponent extends HBox {
     addButton.setOnAction(e -> {
       logger.finest("Add button clicked!");
 
+      final BooleanParameter addAllParameter = new BooleanParameter("Add all", "Add all features",
+          false);
+
       final List<FeatureList> featureLists = MZmineCore.getProjectManager().getCurrentProject()
           .getCurrentFeatureLists();
 
@@ -87,7 +91,7 @@ public class FeaturesComponent extends HBox {
       MultiChoiceParameter<Feature> featuresParam = new MultiChoiceParameter<>("Features",
           "Feature selection", new Feature[0]);
       SimpleParameterSet paramSet = new SimpleParameterSet(
-          new Parameter[]{featureListsParam, dataFilesParam, featuresParam});
+          new Parameter[]{featureListsParam, dataFilesParam, featuresParam, addAllParameter});
 
       ParameterSetupDialog dialog = new ParameterSetupDialog(true, paramSet);
       ComboBox<FeatureList> featureListsCombo = dialog.getComponentForParameter(featureListsParam);
@@ -123,7 +127,12 @@ public class FeaturesComponent extends HBox {
 
       dialog.showAndWait();
       if (dialog.getExitCode() == ExitCode.OK) {
-        currentValue.addAll(featuresSelection.getCheckModel().getCheckedItems());
+        if (addAllParameter.getValue()) {
+
+          currentValue.addAll(featuresSelection.getItems());
+        } else {
+          currentValue.addAll(featuresSelection.getCheckModel().getCheckedItems());
+        }
       }
     });
 
