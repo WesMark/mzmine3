@@ -44,6 +44,9 @@ public class FeatureListRowSorter implements Comparator<FeatureListRow> {
   public static final FeatureListRowSorter MZ_ASCENDING = new FeatureListRowSorter(
       SortingProperty.MZ, SortingDirection.Ascending);
 
+  public static final FeatureListRowSorter HEIGHT_DESCENDING = new FeatureListRowSorter(
+      SortingProperty.Height, SortingDirection.Descending);
+
 
   private final SortingProperty property;
   private final SortingDirection direction;

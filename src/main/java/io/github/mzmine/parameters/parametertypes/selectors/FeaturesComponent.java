@@ -28,6 +28,7 @@ package io.github.mzmine.parameters.parametertypes.selectors;
 import io.github.mzmine.datamodel.RawDataFile;
 import io.github.mzmine.datamodel.features.Feature;
 import io.github.mzmine.datamodel.features.FeatureList;
+import io.github.mzmine.datamodel.features.FeatureListRow;
 import io.github.mzmine.main.MZmineCore;
 import io.github.mzmine.parameters.Parameter;
 import io.github.mzmine.parameters.dialogs.ParameterSetupDialog;
@@ -36,6 +37,7 @@ import io.github.mzmine.parameters.parametertypes.BooleanParameter;
 import io.github.mzmine.parameters.parametertypes.ComboParameter;
 import io.github.mzmine.parameters.parametertypes.MultiChoiceParameter;
 import io.github.mzmine.util.ExitCode;
+import io.github.mzmine.util.FeatureListRowSorter;
 import java.util.List;
 import java.util.logging.Logger;
 import javafx.collections.FXCollections;
@@ -83,6 +85,10 @@ public class FeaturesComponent extends HBox {
 
       final List<FeatureList> featureLists = MZmineCore.getProjectManager().getCurrentProject()
           .getCurrentFeatureLists();
+
+      //Sorting the feature list
+      List<FeatureListRow> rows = featureLists.get(0).getRows();
+      rows.sort(FeatureListRowSorter.HEIGHT_DESCENDING);
 
       ComboParameter<FeatureList> featureListsParam = new ComboParameter<>("Feature list",
           "Feature list selection", FXCollections.observableList(featureLists));
@@ -134,6 +140,7 @@ public class FeaturesComponent extends HBox {
           currentValue.addAll(featuresSelection.getCheckModel().getCheckedItems());
         }
       }
+
     });
 
     removeButton.setOnAction(e -> {

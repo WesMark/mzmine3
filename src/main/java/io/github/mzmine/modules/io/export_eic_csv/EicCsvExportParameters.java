@@ -27,21 +27,25 @@ package io.github.mzmine.modules.io.export_eic_csv;
 
 import io.github.mzmine.parameters.Parameter;
 import io.github.mzmine.parameters.impl.SimpleParameterSet;
+import io.github.mzmine.parameters.parametertypes.TextParameter;
 import io.github.mzmine.parameters.parametertypes.filenames.FileNameParameter;
 import io.github.mzmine.parameters.parametertypes.filenames.FileSelectionType;
-import io.github.mzmine.parameters.parametertypes.selectors.FeaturesParameter;
+import io.github.mzmine.parameters.parametertypes.selectors.FeatureListsParameter;
 
 public class EicCsvExportParameters extends SimpleParameterSet {
 
   public static final FileNameParameter path = new FileNameParameter("Export Path",
       "The path the csv-file will be saved to.", FileSelectionType.SAVE, false);
 
-  public static final FeaturesParameter features = new FeaturesParameter();
+  public static final TextParameter featureIDs = new TextParameter("Feature ID's",
+      "ID's of the features to be exported, seperated by \",\"");
 
+  public static final FeatureListsParameter featureList = new FeatureListsParameter("Feature list",
+      "The feature list to be exported.", 1, 1);
 
   public EicCsvExportParameters() {
 
-    super(new Parameter[]{path, features});
+    super(new Parameter[]{path, featureList, featureIDs});
     setModuleNameAttribute("EIC Export");
   }
 }

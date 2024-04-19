@@ -71,24 +71,27 @@ public class MinimumSearchFeatureResolverParameters extends GeneralResolverParam
 
   public static final DoubleRangeParameter PEAK_DURATION = new DoubleRangeParameter(
       "Peak duration range (min/mobility)", "Range of acceptable peak lengths",
-      MZmineCore.getConfiguration().getRTFormat(), Range.closed(0.0, 10.0));
+      new DecimalFormat("0.0000"), Range.closed(0.0069, 0.0420));
 
   public MinimumSearchFeatureResolverParameters() {
-    super(createParams(Setup.FULL), "https://mzmine.github.io/mzmine_documentation/module_docs/featdet_resolver_local_minimum/local-minimum-resolver.html");
+    super(createParams(Setup.FULL),
+        "https://mzmine.github.io/mzmine_documentation/module_docs/featdet_resolver_local_minimum/local-minimum-resolver.html");
   }
 
   public MinimumSearchFeatureResolverParameters(Setup setup) {
-    super(createParams(setup), "https://mzmine.github.io/mzmine_documentation/module_docs/featdet_resolver_local_minimum/local-minimum-resolver.html");
+    super(createParams(setup),
+        "https://mzmine.github.io/mzmine_documentation/module_docs/featdet_resolver_local_minimum/local-minimum-resolver.html");
   }
 
   private static Parameter[] createParams(Setup setup) {
     return switch (setup) {
-      case FULL -> new Parameter[]{PEAK_LISTS, SUFFIX, handleOriginal, groupMS2Parameters,
-          dimension, CHROMATOGRAPHIC_THRESHOLD_LEVEL, SEARCH_RT_RANGE, MIN_RELATIVE_HEIGHT,
-          MIN_ABSOLUTE_HEIGHT, MIN_RATIO, PEAK_DURATION, MIN_NUMBER_OF_DATAPOINTS};
-      case INTEGRATED -> new Parameter[]{CHROMATOGRAPHIC_THRESHOLD_LEVEL, SEARCH_RT_RANGE,
-          MIN_RELATIVE_HEIGHT, MIN_ABSOLUTE_HEIGHT, MIN_RATIO, PEAK_DURATION,
-          MIN_NUMBER_OF_DATAPOINTS};
+      case FULL ->
+          new Parameter[]{PEAK_LISTS, SUFFIX, handleOriginal, groupMS2Parameters, dimension,
+              CHROMATOGRAPHIC_THRESHOLD_LEVEL, SEARCH_RT_RANGE, MIN_RELATIVE_HEIGHT,
+              MIN_ABSOLUTE_HEIGHT, MIN_RATIO, PEAK_DURATION, MIN_NUMBER_OF_DATAPOINTS};
+      case INTEGRATED ->
+          new Parameter[]{CHROMATOGRAPHIC_THRESHOLD_LEVEL, SEARCH_RT_RANGE, MIN_RELATIVE_HEIGHT,
+              MIN_ABSOLUTE_HEIGHT, MIN_RATIO, PEAK_DURATION, MIN_NUMBER_OF_DATAPOINTS};
     };
   }
 

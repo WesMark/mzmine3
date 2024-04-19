@@ -25,19 +25,21 @@
 
 package io.github.mzmine.modules.io.export_eic_csv;
 
-import io.github.msdk.util.MsSpectrumUtil;
 import io.github.mzmine.datamodel.Scan;
 import io.github.mzmine.datamodel.featuredata.IonTimeSeries;
 import io.github.mzmine.datamodel.featuredata.IonTimeSeriesUtils;
 import io.github.mzmine.datamodel.features.Feature;
+import io.github.mzmine.datamodel.features.ModularFeature;
+import io.github.mzmine.datamodel.features.ModularFeatureList;
 import io.github.mzmine.parameters.ParameterSet;
 import io.github.mzmine.parameters.parametertypes.selectors.ScanSelection;
 import io.github.mzmine.taskcontrol.AbstractTask;
 import io.github.mzmine.taskcontrol.TaskStatus;
-import io.github.mzmine.util.scans.ScanUtils;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -49,19 +51,19 @@ import org.jetbrains.annotations.Nullable;
 
 public class EicCsvExportTask extends AbstractTask {
 
-  // Logger.
   private static final Logger logger = Logger.getLogger(EicCsvExportTask.class.getName());
-
-  //Parameters.
+  private final ModularFeatureList featureList;
+  private final String selectedIDs;
   private final File file;
-  private final List<Feature> features;
 
 
   protected EicCsvExportTask(@Nullable ParameterSet parameter, @NotNull Instant moduleCallDate) {
     super(null, moduleCallDate);
 
     file = parameter.getParameter(EicCsvExportParameters.path).getValue();
-    features = parameter.getParameter(EicCsvExportParameters.features).getValue();
+    featureList = parameter.getParameter(EicCsvExportParameters.featureList).getValue()
+        .getMatchingFeatureLists()[0];
+    selectedIDs = parameter.getParameter(EicCsvExportParameters.featureIDs).getValue();
   }
 
   @Override
@@ -69,57 +71,97 @@ public class EicCsvExportTask extends AbstractTask {
 
     setStatus(TaskStatus.PROCESSING);
 
-    List<IonTimeSeries<Scan>> eics = new ArrayList<>();
-
-    ScanSelection scanSelection = new ScanSelection(1);
-
-    for (Feature feature : features) {
-
-      List<Scan> scansMs1 = Arrays.asList(scanSelection.getMatchingScans(feature.getRawDataFile()));
-
-      IonTimeSeries<Scan> eic = IonTimeSeriesUtils.remapRtAxis(feature.getFeatureData(), scansMs1);
-      eics.add(eic);
+    //Create directory for output files
+    String filePath = file.getAbsolutePath();
+    try {
+      Files.createDirectory(Paths.get(file.getAbsolutePath()));
+    } catch (IOException e) {
+      e.printStackTrace();
+      logger.log(Level.WARNING, e.getMessage());
     }
 
-    int numScans = scanSelection.getMatchingScans(features.get(0).getRawDataFile()).length;
+    int numRawDataFiles = featureList.getRawDataFiles().size();
+    for (int j = 0; j < numRawDataFiles; j++) {
 
-    try {
-      FileWriter writer = new FileWriter(file);
+      //Getting features and IDs of features to be exported.
+      List<ModularFeature> allFeatures = featureList.getFeatures(featureList.getRawDataFile(j));
+      List<String> IDs = Arrays.asList(selectedIDs.split("\\s*,\\s*"));
 
-      writer.write("rt");
-      writer.append(";");
+      //Lists for export data to be stored in
+      List<ModularFeature> features = new ArrayList<>();
+      List<IonTimeSeries<Scan>> eics = new ArrayList<>();
 
-      for (Feature feature : features) {
+      //Extracting features with selected IDs from all features
+      for (String ID : IDs) {
 
-        writer.write(String.valueOf(feature.getMZ()));
-        writer.append(";");
+        int featureID = Integer.parseInt(ID);
+
+        for (ModularFeature feature : allFeatures) {
+          if (feature.getRow().getID() == featureID) {
+            features.add(feature);
+            break;
+          }
+        }
       }
 
-      writer.append("\n");
+      //Scan selection for MS1 scans
+      ScanSelection scanSelection = new ScanSelection(1);
 
-      for (int i = 0; i < numScans; i++) {
+      //Extracting EICs from selected features
+      for (Feature feature : features) {
 
-        float rt = eics.get(0).getRetentionTime(i);
-        writer.write(String.valueOf(rt));
+        List<Scan> scansMs1 = Arrays.asList(
+            scanSelection.getMatchingScans(feature.getRawDataFile()));
+
+        IonTimeSeries<Scan> eic = IonTimeSeriesUtils.remapRtAxis(feature.getFeatureData(),
+            scansMs1);
+        eics.add(eic);
+      }
+
+      //Number of scans for formatting csv file.
+      int numScans = scanSelection.getMatchingScans(features.get(0).getRawDataFile()).length;
+
+      try {
+        //Writing file
+        String rawDataFileName = featureList.getRawDataFile(j).getFileName();
+        FileWriter writer = new FileWriter(filePath + File.separator + rawDataFileName + ".csv");
+
+        writer.write("rt");
         writer.append(";");
 
-        for (IonTimeSeries<Scan> eic : eics) {
+        for (Feature feature : features) {
 
-          double intensity = eic.getIntensity(i);
-          writer.write(String.valueOf(intensity));
+          writer.write(String.valueOf(feature.getMZ()));
           writer.append(";");
         }
 
         writer.append("\n");
+
+        for (int i = 0; i < numScans; i++) {
+
+          float rt = eics.get(0).getRetentionTime(i);
+          writer.write(String.valueOf(rt));
+          writer.append(";");
+
+          for (IonTimeSeries<Scan> eic : eics) {
+
+            double intensity = eic.getIntensity(i);
+            writer.write(String.valueOf(intensity));
+            writer.append(";");
+          }
+
+          writer.append("\n");
+        }
+
+        writer.flush();
+        writer.close();
       }
 
-      writer.flush();
-    }
-
-    //IOException des FileWriter.
-    catch (IOException e) {
-      e.printStackTrace();
-      logger.log(Level.WARNING, e.getMessage());
+      //IOException des FileWriter.
+      catch (IOException e) {
+        e.printStackTrace();
+        logger.log(Level.WARNING, e.getMessage());
+      }
     }
 
     setStatus(TaskStatus.FINISHED);
