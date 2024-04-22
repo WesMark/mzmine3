@@ -43,7 +43,9 @@ import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.jetbrains.annotations.NotNull;
@@ -52,14 +54,19 @@ import org.jetbrains.annotations.Nullable;
 public class EicCsvExportTask extends AbstractTask {
 
   private static final Logger logger = Logger.getLogger(EicCsvExportTask.class.getName());
+
+  //Parameter
   private final ModularFeatureList featureList;
   private final String selectedIDs;
   private final File file;
 
+  //Task Progress
+  private int numRawDataFiles;
+  private int numProcessedRawDataFiles;
+
 
   protected EicCsvExportTask(@Nullable ParameterSet parameter, @NotNull Instant moduleCallDate) {
     super(null, moduleCallDate);
-
     file = parameter.getParameter(EicCsvExportParameters.path).getValue();
     featureList = parameter.getParameter(EicCsvExportParameters.featureList).getValue()
         .getMatchingFeatureLists()[0];
@@ -71,6 +78,10 @@ public class EicCsvExportTask extends AbstractTask {
 
     setStatus(TaskStatus.PROCESSING);
 
+    //Task progress variables
+    numRawDataFiles = featureList.getRawDataFiles().size();
+    numProcessedRawDataFiles = 0;
+
     //Create directory for output files
     String filePath = file.getAbsolutePath();
     try {
@@ -80,16 +91,20 @@ public class EicCsvExportTask extends AbstractTask {
       logger.log(Level.WARNING, e.getMessage());
     }
 
-    int numRawDataFiles = featureList.getRawDataFiles().size();
-    for (int j = 0; j < numRawDataFiles; j++) {
+    //Split user input IDs to List
+    List<String> IDs = Arrays.asList(selectedIDs.split("\\s*,\\s*"));
 
-      //Getting features and IDs of features to be exported.
-      List<ModularFeature> allFeatures = featureList.getFeatures(featureList.getRawDataFile(j));
-      List<String> IDs = Arrays.asList(selectedIDs.split("\\s*,\\s*"));
+    for (int j = 0; j < numRawDataFiles; j++) {
 
       //Lists for export data to be stored in
       List<ModularFeature> features = new ArrayList<>();
       List<IonTimeSeries<Scan>> eics = new ArrayList<>();
+
+      //Map linking feature ID to their index in the EIc list
+      Map<String, Integer> idIndexMap = new HashMap<>();
+
+      //List of all features in selected feature list
+      List<ModularFeature> allFeatures = featureList.getFeatures(featureList.getRawDataFile(j));
 
       //Extracting features with selected IDs from all features
       for (String ID : IDs) {
@@ -99,6 +114,9 @@ public class EicCsvExportTask extends AbstractTask {
         for (ModularFeature feature : allFeatures) {
           if (feature.getRow().getID() == featureID) {
             features.add(feature);
+
+            //Linking feature ID to list index
+            idIndexMap.put(ID, features.indexOf(feature));
             break;
           }
         }
@@ -115,41 +133,64 @@ public class EicCsvExportTask extends AbstractTask {
 
         IonTimeSeries<Scan> eic = IonTimeSeriesUtils.remapRtAxis(feature.getFeatureData(),
             scansMs1);
+
         eics.add(eic);
       }
 
       //Number of scans for formatting csv file.
-      int numScans = scanSelection.getMatchingScans(features.get(0).getRawDataFile()).length;
+      List<Scan> ms1Scans = Arrays.asList(
+          scanSelection.getMatchingScans(featureList.getRawDataFile(j)));
+      int numScans = scanSelection.getMatchingScans(featureList.getRawDataFile(j)).length;
+
+      //Debug logger
+      logger.log(Level.INFO, "Length of Raw Data File: " + String.valueOf(numScans));
+      logger.log(Level.INFO, "Length of EIC List: " + String.valueOf(eics.size()));
+      logger.log(Level.INFO, "Length of Export Feature List: " + String.valueOf(features.size()));
+      logger.log(Level.INFO, "Size of Map: " + String.valueOf(idIndexMap.size()));
+      for (String id : IDs) {
+        logger.log(Level.INFO, "ID: " + id + ", ExportIndex: " + idIndexMap.get(id));
+      }
 
       try {
+
         //Writing file
         String rawDataFileName = featureList.getRawDataFile(j).getFileName();
         FileWriter writer = new FileWriter(filePath + File.separator + rawDataFileName + ".csv");
 
+        //CSV file header
         writer.write("rt");
         writer.append(";");
-
-        for (Feature feature : features) {
-
-          writer.write(String.valueOf(feature.getMZ()));
+        for (String id : IDs) {
+          writer.write(id);
           writer.append(";");
         }
-
         writer.append("\n");
 
+        //Writing EIC data
         for (int i = 0; i < numScans; i++) {
 
-          float rt = eics.get(0).getRetentionTime(i);
+          //RT for row
+          float rt = ms1Scans.get(i).getRetentionTime();
           writer.write(String.valueOf(rt));
           writer.append(";");
 
-          for (IonTimeSeries<Scan> eic : eics) {
+          //Intensities for features
+          for (String ID : IDs) {
 
-            double intensity = eic.getIntensity(i);
-            writer.write(String.valueOf(intensity));
-            writer.append(";");
+            Integer featureExportListIndex = idIndexMap.get(ID);
+
+            //Writing 0 if feature is not present in raw data file
+            if (featureExportListIndex == null) {
+              writer.write("0.0");
+              writer.append(";");
+            }
+            //Writing intensity value otherwise
+            else {
+              double intensity = eics.get(featureExportListIndex).getIntensity(i);
+              writer.write(String.valueOf(intensity));
+              writer.append(";");
+            }
           }
-
           writer.append("\n");
         }
 
@@ -162,6 +203,9 @@ public class EicCsvExportTask extends AbstractTask {
         e.printStackTrace();
         logger.log(Level.WARNING, e.getMessage());
       }
+
+      //Task progress
+      numProcessedRawDataFiles++;
     }
 
     setStatus(TaskStatus.FINISHED);
@@ -174,6 +218,10 @@ public class EicCsvExportTask extends AbstractTask {
 
   @Override
   public double getFinishedPercentage() {
-    return 0;
+    if (numRawDataFiles > 0) {
+      return (double) numProcessedRawDataFiles / (double) numRawDataFiles;
+    } else {
+      return 0;
+    }
   }
 }
