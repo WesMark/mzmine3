@@ -28,14 +28,10 @@ package io.github.mzmine.modules.io.export_potentiogram;
 import io.github.mzmine.parameters.Parameter;
 import io.github.mzmine.parameters.impl.SimpleParameterSet;
 import io.github.mzmine.parameters.parametertypes.DoubleParameter;
-import io.github.mzmine.parameters.parametertypes.StringParameter;
 import io.github.mzmine.parameters.parametertypes.ranges.DoubleRangeParameter;
-import io.github.mzmine.parameters.parametertypes.selectors.FeatureListsParameter;
 import java.text.DecimalFormat;
 
 public class PotentiogramExportParameters extends SimpleParameterSet {
-
-  public static final FeatureListsParameter featureList = new FeatureListsParameter(1, 1);
 
   public static final DoubleParameter delayTime = new DoubleParameter("Delay Time / s",
       "Delay time before analytes from the EC cell reach the mass spectrometer",
@@ -47,11 +43,8 @@ public class PotentiogramExportParameters extends SimpleParameterSet {
   public static final DoubleRangeParameter potentialRange = new DoubleRangeParameter(
       "Potential Range / mV", "Minimal and maximal potential of ramp.", new DecimalFormat("0.0"));
 
-  public static final StringParameter featureIDs = new StringParameter("Feature ID's",
-      "ID's of features to be exported");
-
   public PotentiogramExportParameters() {
-    super(new Parameter[]{featureList, featureIDs, delayTime, potentialRampSpeed, potentialRange});
+    super(new Parameter[]{delayTime, potentialRampSpeed, potentialRange});
   }
 
 }

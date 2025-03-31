@@ -25,18 +25,36 @@
 
 package io.github.mzmine.modules.io.export_potentiogram;
 
-import io.github.mzmine.datamodel.MZmineProject;
-import io.github.mzmine.modules.MZmineModuleCategory;
-import io.github.mzmine.modules.MZmineRunnableModule;
+import com.google.common.collect.Range;
+import io.github.mzmine.datamodel.features.ModularFeatureListRow;
+import io.github.mzmine.main.MZmineCore;
+import io.github.mzmine.modules.MZmineModule;
 import io.github.mzmine.parameters.ParameterSet;
-import io.github.mzmine.taskcontrol.Task;
 import io.github.mzmine.util.ExitCode;
-import java.time.Instant;
-import java.util.Collection;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-public class PotentiogramExportModule implements MZmineRunnableModule {
+public class PotentiogramExportModule implements MZmineModule {
+
+  public static void exportPotentiogram(ModularFeatureListRow row) {
+
+//    Get parameters from user.
+    ParameterSet parameters = MZmineCore.getConfiguration()
+        .getModuleParameters(PotentiogramExportModule.class);
+
+    ExitCode exitCode = parameters.showSetupDialog(true);
+    if (exitCode != ExitCode.OK) {
+      return;
+    }
+
+    double delayTime = parameters.getValue(PotentiogramExportParameters.delayTime);
+    double potentialRampSpeed = parameters.getValue(
+        PotentiogramExportParameters.potentialRampSpeed);
+    Range<Double> potentialRange = parameters.getValue(PotentiogramExportParameters.potentialRange);
+
+//    Extract transient data from row.
+
+  }
 
   @Override
   public @NotNull String getName() {
@@ -44,26 +62,7 @@ public class PotentiogramExportModule implements MZmineRunnableModule {
   }
 
   @Override
-  public @NotNull String getDescription() {
-    return "Exports a transient signal of intensity vs. applied potential for selected features.";
-  }
-
-  @Override
   public @Nullable Class<? extends ParameterSet> getParameterSetClass() {
     return PotentiogramExportParameters.class;
-  }
-
-  @Override
-  public @NotNull MZmineModuleCategory getModuleCategory() {
-    return MZmineModuleCategory.FEATURELISTEXPORT;
-  }
-
-  @Override
-  public @NotNull ExitCode runModule(@NotNull MZmineProject project,
-      @NotNull ParameterSet parameters, @NotNull Collection<Task> tasks,
-      @NotNull Instant moduleCallDate) {
-
-    tasks.add(new PotentiogramExportTask(parameters, moduleCallDate));
-    return ExitCode.OK;
   }
 }
