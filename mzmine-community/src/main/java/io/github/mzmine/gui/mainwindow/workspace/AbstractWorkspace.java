@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2024 The mzmine Development Team
+ * Copyright (c) 2004-2022 The MZmine Development Team
  *
  * Permission is hereby granted, free of charge, to any person
  * obtaining a copy of this software and associated documentation
@@ -94,6 +94,7 @@ import io.github.mzmine.modules.io.export_library_analysis_csv.LibraryAnalysisCS
 import io.github.mzmine.modules.io.export_library_gnps_batch.GNPSLibraryBatchExportModule;
 import io.github.mzmine.modules.io.export_msmsquality.MsMsQualityExportModule;
 import io.github.mzmine.modules.io.export_network_graphml.NetworkGraphMlExportModule;
+import io.github.mzmine.modules.io.export_potentiogram.PotentiogramExportModule;
 import io.github.mzmine.modules.io.export_scans_modular.ExportScansFeatureModule;
 import io.github.mzmine.modules.io.import_feature_networks.ImportFeatureNetworksSimpleModule;
 import io.github.mzmine.modules.io.projectload.ProjectLoadModule;
@@ -266,6 +267,7 @@ public abstract class AbstractWorkspace implements Workspace {
     addModuleMenuItems(menu, "Graphics", ExportAllIdsGraphicalModule.class);
     addModuleMenuItems(menu, CSVExportModularModule.class, CompoundAnnotationsCSVExportModule.class,
         LegacyCSVExportModule.class, MZTabmExportModule.class, SQLExportModule.class,
+        PotentiogramExportModule.class,
         // scans
         ExportScansFeatureModule.class, AdapMspExportModule.class, AdapMgfExportModule.class,
         GnpsFbmnExportAndSubmitModule.class, GnpsGcExportAndSubmitModule.class,

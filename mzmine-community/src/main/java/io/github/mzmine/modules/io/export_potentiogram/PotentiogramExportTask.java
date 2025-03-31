@@ -25,6 +25,8 @@
 
 package io.github.mzmine.modules.io.export_potentiogram;
 
+import com.google.common.collect.Range;
+import io.github.mzmine.datamodel.features.FeatureList;
 import io.github.mzmine.parameters.ParameterSet;
 import io.github.mzmine.taskcontrol.AbstractTask;
 import io.github.mzmine.taskcontrol.TaskStatus;
@@ -33,8 +35,21 @@ import javax.validation.constraints.NotNull;
 
 public class PotentiogramExportTask extends AbstractTask {
 
+  //Parameters
+  private final FeatureList featureList;
+  private final double delayTime;
+  private final double potentialScanRate;
+  private final Range<Double> potentialRange;
+//  private final ArrayList<Double> featureIDs;
+
   public PotentiogramExportTask(@NotNull ParameterSet parameters, @NotNull Instant moduleCallDate) {
     super(null, moduleCallDate);
+
+    featureList = parameters.getValue(PotentiogramExportParameters.featureList)
+        .getMatchingFeatureLists()[0];
+    delayTime = parameters.getValue(PotentiogramExportParameters.delayTime);
+    potentialScanRate = parameters.getValue(PotentiogramExportParameters.potentialRampSpeed);
+    potentialRange = parameters.getValue(PotentiogramExportParameters.potentialRange);
   }
 
   @Override
@@ -52,7 +67,7 @@ public class PotentiogramExportTask extends AbstractTask {
 
     setStatus(TaskStatus.PROCESSING);
 
-    System.out.println("Hello world!");
+    System.out.println("Hallo Welt!");
 
     setStatus(TaskStatus.FINISHED);
   }
