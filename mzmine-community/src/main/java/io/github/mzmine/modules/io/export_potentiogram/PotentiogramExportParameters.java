@@ -25,13 +25,22 @@
 
 package io.github.mzmine.modules.io.export_potentiogram;
 
+import com.google.common.collect.Range;
 import io.github.mzmine.parameters.Parameter;
 import io.github.mzmine.parameters.impl.SimpleParameterSet;
 import io.github.mzmine.parameters.parametertypes.DoubleParameter;
+import io.github.mzmine.parameters.parametertypes.filenames.FileNameParameter;
+import io.github.mzmine.parameters.parametertypes.filenames.FileSelectionType;
 import io.github.mzmine.parameters.parametertypes.ranges.DoubleRangeParameter;
+import io.github.mzmine.util.files.ExtensionFilters;
 import java.text.DecimalFormat;
+import java.util.Collections;
 
 public class PotentiogramExportParameters extends SimpleParameterSet {
+
+  public static final FileNameParameter path = new FileNameParameter("Path",
+      "The path the file potentiogram will be saved to",
+      Collections.singletonList(ExtensionFilters.CSV), FileSelectionType.SAVE);
 
   public static final DoubleParameter delayTime = new DoubleParameter("Delay Time / s",
       "Delay time before analytes from the EC cell reach the mass spectrometer",
@@ -41,10 +50,11 @@ public class PotentiogramExportParameters extends SimpleParameterSet {
       "Potential Ramp / mV/s", "Potential ramp speed in mV/s.", new DecimalFormat("0.0"), 10d);
 
   public static final DoubleRangeParameter potentialRange = new DoubleRangeParameter(
-      "Potential Range / mV", "Minimal and maximal potential of ramp.", new DecimalFormat("0.0"));
+      "Potential Range / mV", "Minimal and maximal potential of ramp.", new DecimalFormat("0.0"),
+      Range.closed(Double.valueOf(0), Double.valueOf(3500)));
 
   public PotentiogramExportParameters() {
-    super(new Parameter[]{delayTime, potentialRampSpeed, potentialRange});
+    super(new Parameter[]{path, delayTime, potentialRampSpeed, potentialRange});
   }
 
 }

@@ -26,15 +26,31 @@
 package io.github.mzmine.modules.io.export_potentiogram;
 
 import com.google.common.collect.Range;
+import io.github.mzmine.datamodel.Scan;
+import io.github.mzmine.datamodel.featuredata.IonTimeSeries;
+import io.github.mzmine.datamodel.featuredata.IonTimeSeriesUtils;
+import io.github.mzmine.datamodel.features.ModularFeature;
 import io.github.mzmine.datamodel.features.ModularFeatureListRow;
 import io.github.mzmine.main.MZmineCore;
 import io.github.mzmine.modules.MZmineModule;
 import io.github.mzmine.parameters.ParameterSet;
+import io.github.mzmine.parameters.parametertypes.selectors.ScanSelection;
 import io.github.mzmine.util.ExitCode;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 public class PotentiogramExportModule implements MZmineModule {
+
+  //  Logger
+  private static final Logger logger = Logger.getLogger(PotentiogramExportModule.class.getName());
 
   public static void exportPotentiogram(ModularFeatureListRow row) {
 
@@ -53,7 +69,54 @@ public class PotentiogramExportModule implements MZmineModule {
     Range<Double> potentialRange = parameters.getValue(PotentiogramExportParameters.potentialRange);
 
 //    Extract transient data from row.
+    ModularFeature feature = row.getBestFeature();
+    List<Scan> allFeatureScans = Arrays.asList(
+        ScanSelection.MS1.getMatchingScans(feature.getRawDataFile()));
+    IonTimeSeries<? extends Scan> eic = IonTimeSeriesUtils.remapRtAxis(feature.getFeatureData(),
+        allFeatureScans);
 
+//    Convert Rt to applied potential and extract scans in potential range.
+    List<Double> intensities = new ArrayList<>();
+    List<Double> potentials = new ArrayList<>();
+
+    for (int i = 0; i < eic.getNumberOfValues(); i++) {
+
+      double rt = eic.getRetentionTime(i);
+      if ((rt * 60) < delayTime) {
+        continue;
+      }
+
+      double potential = ((rt * 60) - delayTime) * potentialRampSpeed;
+      if (potential < potentialRange.lowerEndpoint()) {
+        continue;
+      } else if (potential >= potentialRange.upperEndpoint()) {
+        break;
+      }
+
+      potentials.add(potential);
+      intensities.add(eic.getIntensity(i));
+    }
+
+//Write data to CSV file
+    File file = parameters.getValue(PotentiogramExportParameters.path);
+
+    try {
+      FileWriter writer = new FileWriter(file);
+      writer.append("Potential [mV], Intensity [a.u.]");
+      writer.append("\n");
+
+      for (int i = 0; i < potentials.size(); i++) {
+        writer.append(String.valueOf(potentials.get(i)));
+        writer.append(",");
+        writer.append(String.valueOf(intensities.get(i)));
+        writer.append("\n");
+      }
+      writer.flush();
+      writer.close();
+    } catch (IOException e) {
+      e.printStackTrace();
+      logger.log(Level.WARNING, e.getMessage(), e);
+    }
   }
 
   @Override
