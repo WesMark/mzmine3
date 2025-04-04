@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2024 The mzmine Development Team
+ * Copyright (c) 2004-2022 The MZmine Development Team
  *
  * Permission is hereby granted, free of charge, to any person
  * obtaining a copy of this software and associated documentation
@@ -90,6 +90,7 @@ import io.github.mzmine.modules.io.export_features_mztabm.MZTabmExportModule;
 import io.github.mzmine.modules.io.export_features_sirius.SiriusExportModule;
 import io.github.mzmine.modules.io.export_features_sql.SQLExportModule;
 import io.github.mzmine.modules.io.export_features_venn.VennExportModule;
+import io.github.mzmine.modules.io.export_la_csv.LaCsvExportModule;
 import io.github.mzmine.modules.io.export_library_analysis_csv.LibraryAnalysisCSVExportModule;
 import io.github.mzmine.modules.io.export_library_gnps_batch.GNPSLibraryBatchExportModule;
 import io.github.mzmine.modules.io.export_msmsquality.MsMsQualityExportModule;
@@ -264,8 +265,9 @@ public abstract class AbstractWorkspace implements Workspace {
     final Menu menu = new Menu("Export feature list");
 
     addModuleMenuItems(menu, "Graphics", ExportAllIdsGraphicalModule.class);
-    addModuleMenuItems(menu, CSVExportModularModule.class, CompoundAnnotationsCSVExportModule.class,
-        LegacyCSVExportModule.class, MZTabmExportModule.class, SQLExportModule.class,
+    addModuleMenuItems(menu, LaCsvExportModule.class, CSVExportModularModule.class,
+        CompoundAnnotationsCSVExportModule.class, LegacyCSVExportModule.class,
+        MZTabmExportModule.class, SQLExportModule.class,
         // scans
         ExportScansFeatureModule.class, AdapMspExportModule.class, AdapMgfExportModule.class,
         GnpsFbmnExportAndSubmitModule.class, GnpsGcExportAndSubmitModule.class,
