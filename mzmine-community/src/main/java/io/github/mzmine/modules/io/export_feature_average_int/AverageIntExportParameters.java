@@ -40,6 +40,6 @@ public class AverageIntExportParameters extends SimpleParameterSet {
       "Path to store the exported file.", FileSelectionType.SAVE);
 
   public AverageIntExportParameters() {
-    super(new Parameter[]{featureList});
+    super(new Parameter[]{featureList, file});
   }
 }

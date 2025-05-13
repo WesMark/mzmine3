@@ -103,14 +103,24 @@ public class AverageIntExportTask extends AbstractTask {
     try (FileWriter fileWriter = new FileWriter(file)) {
 
       fileWriter.append("m/z");
-      fileWriter.append(",");
 
       for (RawDataFile rawDataFile : rawDataFiles) {
-        fileWriter.append(rawDataFile.getFileName());
         fileWriter.append(",");
+        fileWriter.append(rawDataFile.getFileName());
       }
 
-      fileWriter.append("\n");
+      for (int i = 0; i < outputData.size(); i++) {
+
+        fileWriter.append("\n");
+        fileWriter.append(String.valueOf(featureList.getRow(i).getAverageMZ()));
+
+        for (int j = 0; j < numRawDataFiles; j++) {
+          fileWriter.append(",");
+          fileWriter.append(String.valueOf(outputData.get(i).get(j)));
+        }
+      }
+
+      fileWriter.flush();
 
 
     } catch (IOException e) {

@@ -264,7 +264,7 @@ public abstract class AbstractWorkspace implements Workspace {
   protected Menu buildDefaultFeatureListExportSubMenu() {
     final Menu menu = new Menu("Export feature list");
 
-    addModuleMenuItems(menu, "Average Intensity Export", AverageIntExportModule.class);
+    addModuleMenuItems(menu, AverageIntExportModule.class);
 
     addModuleMenuItems(menu, "Graphics", ExportAllIdsGraphicalModule.class);
     addModuleMenuItems(menu, CSVExportModularModule.class, CompoundAnnotationsCSVExportModule.class,
