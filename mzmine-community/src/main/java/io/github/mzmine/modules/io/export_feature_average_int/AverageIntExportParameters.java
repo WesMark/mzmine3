@@ -25,6 +25,21 @@
 
 package io.github.mzmine.modules.io.export_feature_average_int;
 
-public class AverageIntExportParameters {
+import io.github.mzmine.parameters.Parameter;
+import io.github.mzmine.parameters.impl.SimpleParameterSet;
+import io.github.mzmine.parameters.parametertypes.filenames.FileNameParameter;
+import io.github.mzmine.parameters.parametertypes.filenames.FileSelectionType;
+import io.github.mzmine.parameters.parametertypes.selectors.FeatureListsParameter;
 
+public class AverageIntExportParameters extends SimpleParameterSet {
+
+  public static final FeatureListsParameter featureList = new FeatureListsParameter("Feature List",
+      "Feature list for export of average intensities.", 1, 1);
+
+  public static final FileNameParameter file = new FileNameParameter("Export path",
+      "Path to store the exported file.", FileSelectionType.SAVE);
+
+  public AverageIntExportParameters() {
+    super(new Parameter[]{featureList});
+  }
 }

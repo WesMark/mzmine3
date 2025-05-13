@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004-2024 The mzmine Development Team
+ * Copyright (c) 2004-2022 The MZmine Development Team
  *
  * Permission is hereby granted, free of charge, to any person
  * obtaining a copy of this software and associated documentation
@@ -77,6 +77,7 @@ import io.github.mzmine.modules.dataprocessing.id_online_reactivity.OnlineLcReac
 import io.github.mzmine.modules.dataprocessing.id_spectral_library_match.SpectralLibrarySearchModule;
 import io.github.mzmine.modules.io.export_ccsbase.CcsBaseExportModule;
 import io.github.mzmine.modules.io.export_compoundAnnotations_csv.CompoundAnnotationsCSVExportModule;
+import io.github.mzmine.modules.io.export_feature_average_int.AverageIntExportModule;
 import io.github.mzmine.modules.io.export_features_all_speclib_matches.ExportAllIdsGraphicalModule;
 import io.github.mzmine.modules.io.export_features_csv.CSVExportModularModule;
 import io.github.mzmine.modules.io.export_features_csv_legacy.LegacyCSVExportModule;
@@ -262,6 +263,8 @@ public abstract class AbstractWorkspace implements Workspace {
 
   protected Menu buildDefaultFeatureListExportSubMenu() {
     final Menu menu = new Menu("Export feature list");
+
+    addModuleMenuItems(menu, "Average Intensity Export", AverageIntExportModule.class);
 
     addModuleMenuItems(menu, "Graphics", ExportAllIdsGraphicalModule.class);
     addModuleMenuItems(menu, CSVExportModularModule.class, CompoundAnnotationsCSVExportModule.class,
