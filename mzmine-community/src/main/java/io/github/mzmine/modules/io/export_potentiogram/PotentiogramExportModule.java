@@ -86,7 +86,8 @@ public class PotentiogramExportModule implements MZmineModule {
         continue;
       }
 
-      double potential = ((rt * 60) - delayTime) * potentialRampSpeed;
+      double potential =
+          potentialRange.lowerEndpoint() + ((rt * 60) - delayTime) * potentialRampSpeed;
       if (potential < potentialRange.lowerEndpoint()) {
         continue;
       } else if (potential >= potentialRange.upperEndpoint()) {
